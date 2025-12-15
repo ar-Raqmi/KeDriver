@@ -2,6 +2,8 @@
 
 A digital vehicle logging and trip management application for fleet management. Track vehicle usage, driver trips, and generate reports.
 
+![Login Page](images/loginpage.png)
+
 ## Features
 
 - **Driver Portal**: Start/end trips with origin, destination, vehicle selection, and passenger count
