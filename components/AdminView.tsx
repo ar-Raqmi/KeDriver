@@ -25,7 +25,8 @@ import {
   MapPin,
   Clock,
   AlertTriangle,
-  StickyNote
+  StickyNote,
+  Filter
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -46,6 +47,7 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
   
   // Filters & Sorting
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'custom'>('all');
+  const [selectedDriverFilter, setSelectedDriverFilter] = useState('all'); // New Driver Filter
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [customStartDate, setCustomStartDate] = useState('');
@@ -79,7 +81,7 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
 
   useEffect(() => {
     loadData();
-  }, [activeTab]);
+  }, [activeTab]); // Reload when tab changes
 
   const loadData = async () => {
     setLoading(true);
@@ -98,12 +100,29 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
     }
   };
 
+  const formatDuration = (totalMinutes?: number) => {
+    if (!totalMinutes && totalMinutes !== 0) return 'Aktif';
+    
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    
+    if (hours > 0) {
+      return `${hours} Jam ${minutes > 0 ? `${minutes} Minit` : ''}`;
+    }
+    return `${minutes} Minit`;
+  };
+
   const getFilteredTrips = () => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const oneWeekAgo = today - (7 * 24 * 60 * 60 * 1000);
 
     let filtered = trips.filter(trip => {
+      // Driver Filter
+      if (selectedDriverFilter !== 'all' && trip.driverId !== selectedDriverFilter) {
+        return false;
+      }
+
       // Date Filter
       let passDate = true;
       if (dateFilter === 'today') {
@@ -144,17 +163,23 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
       return;
     }
 
-    const doc = new jspdf.jsPDF('l', 'mm', 'a4');
+    const doc = new jspdf.jsPDF('l', 'mm', 'a4'); // Landscape for better column fit
     
     // Header
     doc.setFontSize(12);
-    doc.setTextColor(245, 158, 11);
+    doc.setTextColor(245, 158, 11); // Primary color
     doc.text("KeDriver - Laporan Perjalanan", 14, 22);
     
     doc.setFontSize(9);
     doc.setTextColor(100);
     doc.text(`Dijana oleh: ${user.name}`, 14, 30);
     doc.text(`Tarikh: ${format(new Date(), 'dd/MM/yyyy hh:mm a')}`, 14, 36);
+
+    // Filter Info in PDF
+    if (selectedDriverFilter !== 'all') {
+      const driverName = usersList.find(u => u.id === selectedDriverFilter)?.name || 'Unknown';
+      doc.text(`Filter Pemandu: ${driverName}`, 14, 42);
+    }
 
     // Table
     const tableData = filteredTrips.map(t => {
@@ -171,17 +196,19 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
          t.origin + (t.destination ? ` > ${t.destination}` : ' > [Aktif]'),
          t.passengers || '-',
          t.remarks || '-',
-         t.durationMinutes ? `${t.durationMinutes} min` : 'Aktif'
+         formatDuration(t.durationMinutes)
        ];
     });
 
+    const startY = selectedDriverFilter !== 'all' ? 48 : 44;
+
     doc.autoTable({
-      startY: 44,
+      startY: startY,
       head: [['Mula', 'Tamat', 'Pemandu', 'Plat', 'Model', 'Laluan', 'Penumpang', 'Catatan', 'Tempoh']],
       body: tableData,
       theme: 'grid',
-      headStyles: { fillColor: [245, 158, 11] },
-      styles: { fontSize: 7, cellPadding: 2 },
+      headStyles: { fillColor: [245, 158, 11] }, // Amber 500
+      styles: { fontSize: 7, cellPadding: 2 }, // Smaller font
       columnStyles: {
         0: { cellWidth: 20 }, // Mula
         1: { cellWidth: 20 }, // Tamat
@@ -191,7 +218,7 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
         // Laluan
         6: { cellWidth: 25 }, // Penumpang
         7: { cellWidth: 25 }, // Catatan
-        8: { cellWidth: 16 }, // Tempoh
+        8: { cellWidth: 20 }, // Tempoh
       }
     });
 
@@ -593,17 +620,39 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
 
             {/* Filters */}
             <div className="bg-white p-4 rounded-xl shadow-sm border border-amber-100 flex flex-col gap-4">
-              <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex flex-col xl:flex-row gap-4">
+                
+                {/* Search */}
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-2.5 text-gray-400 w-5 h-5" />
                   <input 
                     type="text" 
-                    placeholder="Cari pemandu, plat, catatan atau lokasi..." 
+                    placeholder="Cari plat, catatan atau lokasi..." 
                     className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
+
+                {/* Driver Filter */}
+                <div className="relative min-w-[220px]">
+                  <Filter className="absolute left-3 top-2.5 text-gray-400 w-4 h-4" />
+                  <select 
+                     value={selectedDriverFilter}
+                     onChange={(e) => setSelectedDriverFilter(e.target.value)}
+                     className="w-full pl-9 pr-8 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900 appearance-none"
+                  >
+                    <option value="all">Semua Pemandu</option>
+                    {usersList
+                      .filter(u => u.role === UserRole.DRIVER || u.role === UserRole.HEAD_DRIVER)
+                      .map(u => (
+                        <option key={u.id} value={u.id}>{u.name}</option>
+                    ))}
+                  </select>
+                  <ArrowDown className="absolute right-3 top-3 text-gray-400 w-3 h-3 pointer-events-none" />
+                </div>
+
+                {/* Date Filter Buttons */}
                 <div className="flex bg-gray-100 p-1 rounded-lg overflow-x-auto">
                   <button 
                     onClick={() => setDateFilter('all')}
@@ -733,7 +782,7 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                               </span>
                             ) : (
                               <span className="text-sm text-gray-600 font-medium whitespace-nowrap">
-                                {trip.durationMinutes} minit
+                                {formatDuration(trip.durationMinutes)}
                               </span>
                             )}
                          </td>
