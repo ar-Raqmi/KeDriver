@@ -337,7 +337,7 @@ const DriverView: React.FC<DriverViewProps> = ({ user, onLogout }) => {
           {/* Passengers */}
           <div className="space-y-2">
             <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-              <Users className="w-4 h-4 text-primary-500" /> Penumpang (Pilihan)
+              <Users className="w-4 h-4 text-primary-500" /> Penumpang
             </label>
             <input 
               type="text" 
