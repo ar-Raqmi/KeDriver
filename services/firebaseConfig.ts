@@ -1,6 +1,6 @@
 
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "YOUR_API_KEY",
@@ -14,12 +14,21 @@ const firebaseConfig = {
 
 // Initialize Firebase
 let app;
-let db;
+let db: any;
 
 try {
   app = initializeApp(firebaseConfig);
   db = getFirestore(app);
-  console.log("✅ Firebase Connected Successfully to Project:", firebaseConfig.projectId);
+  
+  enableIndexedDbPersistence(db).catch((err) => {
+      if (err.code == 'failed-precondition') {
+          console.warn("Multiple tabs open, persistence can only be enabled in one tab at a a time.");
+      } else if (err.code == 'unimplemented') {
+          console.warn("The current browser does not support all of the features required to enable persistence");
+      }
+  });
+
+  console.log("✅ Firebase Connected Successfully with Persistence");
 } catch (error) {
   console.error("❌ Error initializing Firebase:", error);
 }
