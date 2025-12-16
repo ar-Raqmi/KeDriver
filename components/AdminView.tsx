@@ -184,7 +184,9 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
     // Table
     const tableData = filteredTrips.map(t => {
        const vehicle = vehicles.find(v => v.id === t.vehicleId);
-       const vehicleType = vehicle ? vehicle.type : (t.vehicleModel || '-');
+       const displayBrand = t.vehicleBrand || vehicle?.type || '-';
+       const displayModel = t.vehicleModel || vehicle?.model || '-';
+       
        const formattedEndTime = t.endTime ? format(t.endTime, 'dd/MM/yyyy hh:mm a') : '-';
        
        return [
@@ -192,7 +194,8 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
          formattedEndTime,
          t.driverName,
          t.plateNumber,
-         t.vehicleModel,
+         displayBrand,
+         displayModel,
          t.origin + (t.destination ? ` > ${t.destination}` : ' > [Aktif]'),
          t.passengers || '-',
          t.remarks || '-',
@@ -204,7 +207,7 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
 
     doc.autoTable({
       startY: startY,
-      head: [['Mula', 'Tamat', 'Pemandu', 'Plat', 'Jenis', 'Lokasi', 'Penumpang', 'Catatan', 'Tempoh']],
+      head: [['Mula', 'Tamat', 'Pemandu', 'Plat', 'Jenama', 'Jenis', 'Lokasi', 'Penumpang', 'Catatan', 'Tempoh']],
       body: tableData,
       theme: 'grid',
       headStyles: { fillColor: [245, 158, 11] }, // Amber 500
@@ -214,11 +217,12 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
         1: { cellWidth: 20 }, // Tamat
         // Pemandu
         3: { cellWidth: 20 }, // Plat
-        4: { cellWidth: 20 }, // Jenis
+        4: { cellWidth: 20 }, // Jenama
+        5: { cellWidth: 20 }, // Jenis
         // Lokasi
-        6: { cellWidth: 25 }, // Penumpang
-        7: { cellWidth: 25 }, // Catatan
-        8: { cellWidth: 20 }, // Tempoh
+        7: { cellWidth: 25 }, // Penumpang
+        8: { cellWidth: 25 }, // Catatan
+        9: { cellWidth: 15 }, // Tempoh
       }
     });
 
@@ -526,7 +530,13 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                                   value={editingTrip.vehicleId}
                                   onChange={e => {
                                       const v = vehicles.find(veh => veh.id === e.target.value);
-                                      if(v) setEditingTrip({...editingTrip, vehicleId: v.id, plateNumber: v.plateNumber, vehicleModel: v.model});
+                                      if(v) setEditingTrip({
+                                          ...editingTrip, 
+                                          vehicleId: v.id, 
+                                          plateNumber: v.plateNumber, 
+                                          vehicleModel: v.model,
+                                          vehicleBrand: v.type
+                                      });
                                   }}
                                   className="w-full border p-2 rounded-lg bg-gray-50 text-gray-900 text-sm"
                               >
@@ -734,7 +744,12 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {filteredTrips.map(trip => (
+                      {filteredTrips.map(trip => {
+                        const vehicle = vehicles.find(v => v.id === trip.vehicleId);
+                        const displayBrand = trip.vehicleBrand || vehicle?.type || '-';
+                        const displayModel = trip.vehicleModel || vehicle?.model || '-';
+
+                        return (
                         <tr key={trip.id} className="hover:bg-gray-50/50">
                           <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
                             <div className="font-medium text-gray-900">{format(trip.startTime, 'dd/MM/yyyy')}</div>
@@ -758,7 +773,10 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                           </td>
                           <td className="px-6 py-4">
                             <p className="text-sm font-bold text-gray-800 whitespace-nowrap">{trip.plateNumber}</p>
-                            <p className="text-xs text-gray-500">{trip.vehicleModel}</p>
+                            <div className="flex flex-col">
+                                <span className="text-xs text-gray-500 font-medium">{displayBrand}</span>
+                                <span className="text-xs text-gray-400">{displayModel}</span>
+                            </div>
                           </td>
                           <td className="px-6 py-4 min-w-[200px]">
                             <div className="flex flex-col gap-1">
@@ -811,7 +829,7 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                             </div>
                           </td>
                         </tr>
-                      ))}
+                      )})}
                       {filteredTrips.length === 0 && (
                         <tr>
                           <td colSpan={8} className="px-6 py-12 text-center text-gray-400">
@@ -901,13 +919,13 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                           />
                         </div>
                         <div>
-                          <label className="text-xs font-bold text-gray-500">Jenis (Contoh: Lori, MPV, Van)</label>
+                          <label className="text-xs font-bold text-gray-500">Jenama (Contoh: Toyota, Hino)</label>
                           <input 
                               type="text"
                               value={editingVehicle.type} 
                               onChange={e => setEditingVehicle({...editingVehicle, type: e.target.value})}
                               className="w-full border p-2 rounded-lg bg-white text-gray-900"
-                              placeholder="Jenis Kenderaan"
+                              placeholder="Jenama Kenderaan"
                             />
                         </div>
                         <div className="flex gap-2 pt-2">
@@ -1029,7 +1047,7 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                     <input 
                       type="text"
                       className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white text-gray-900 text-sm"
-                      placeholder="Jenama"
+                      placeholder="Jenama (Contoh: Toyota, Hino)"
                       value={newVehicleType}
                       onChange={(e) => setNewVehicleType(e.target.value)}
                     />

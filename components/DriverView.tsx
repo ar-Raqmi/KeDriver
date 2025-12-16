@@ -82,6 +82,7 @@ const DriverView: React.FC<DriverViewProps> = ({ user, onLogout }) => {
       driverName: user.name,
       vehicleId: vehicle.id,
       vehicleModel: vehicle.model,
+      vehicleBrand: vehicle.type, // Save Brand (Jenama)
       plateNumber: vehicle.plateNumber,
       origin: origin,
       destination: '', 
@@ -234,6 +235,7 @@ const DriverView: React.FC<DriverViewProps> = ({ user, onLogout }) => {
                   <div>
                     <span className="text-xs text-gray-500 block">Kenderaan</span>
                     <span className="font-bold text-gray-800">{activeTrip.plateNumber}</span>
+                    <span className="text-xs text-gray-500 block">{activeTrip.vehicleBrand}</span>
                   </div>
                   <div>
                     <span className="text-xs text-gray-500 block">Dari</span>
@@ -344,8 +346,11 @@ const DriverView: React.FC<DriverViewProps> = ({ user, onLogout }) => {
                     : 'border-gray-200 hover:border-primary-300'
                   }`}
                 >
-                  <div className="font-bold text-gray-800">{v.plateNumber}</div>
-                  <div className="text-xs text-gray-500">{v.model} • {v.type}</div>
+                  <div className="flex justify-between items-center">
+                    <div className="font-bold text-gray-800">{v.plateNumber}</div>
+                    <div className="text-xs font-bold text-primary-600 bg-primary-50 px-2 py-0.5 rounded">{v.type}</div>
+                  </div>
+                  <div className="text-xs text-gray-500">{v.model}</div>
                 </button>
               )) : (
                 <div className="text-center p-4 text-gray-400 text-sm bg-gray-50 rounded-lg">

@@ -26,13 +26,14 @@ export interface Trip {
   driverName: string;
   vehicleId: string;
   vehicleModel: string;
+  vehicleBrand?: string;
   plateNumber: string;
   origin: string;
   destination: string;
-  passengers: string; // Comma separated names or count
-  remarks?: string; // New field for Catatan
-  startTime: number; // Timestamp
-  endTime?: number; // Timestamp
+  passengers: string; 
+  remarks?: string;
+  startTime: number;
+  endTime?: number;
   durationMinutes?: number;
   status: 'ACTIVE' | 'COMPLETED';
 }
