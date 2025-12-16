@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Vehicle, Trip } from '../types';
 import { getVehicles, startTrip, endTrip, getActiveTripForDriver } from '../services/storageService';
-import { Car, MapPin, Users, Fingerprint, Clock, Navigation, LogOut, AlertTriangle, CheckCircle, Loader2, StickyNote } from 'lucide-react';
+import { Car, MapPin, Users, Fingerprint, Clock, Navigation, LogOut, AlertTriangle, CheckCircle, Loader2, StickyNote, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface DriverViewProps {
@@ -14,6 +14,7 @@ const DriverView: React.FC<DriverViewProps> = ({ user, onLogout }) => {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [activeTrip, setActiveTrip] = useState<Trip | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Start Form State
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
@@ -27,15 +28,28 @@ const DriverView: React.FC<DriverViewProps> = ({ user, onLogout }) => {
   const [showConfirmStop, setShowConfirmStop] = useState(false);
 
   useEffect(() => {
-    const init = async () => {
-      setIsLoading(true);
+    initData();
+  }, [user.id]);
+
+  const initData = async () => {
+    setIsLoading(true);
+    await refreshData();
+    setIsLoading(false);
+  };
+
+  const refreshData = async () => {
+    setIsRefreshing(true);
+    try {
       const v = await getVehicles();
       setVehicles(v);
       await loadActiveTrip();
-      setIsLoading(false);
-    };
-    init();
-  }, [user.id]);
+    } catch (e) {
+      console.error(e);
+      setError("Gagal menyegarkan data.");
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
 
   const loadActiveTrip = async () => {
     const existing = await getActiveTripForDriver(user.id);
@@ -182,8 +196,17 @@ const DriverView: React.FC<DriverViewProps> = ({ user, onLogout }) => {
                 </div>
                 <h1 className="text-2xl font-bold">Sedang Memandu</h1>
              </div>
-             <div className="bg-white/20 p-2 rounded-full">
-               <Navigation className="w-6 h-6 text-white" />
+             <div className="flex gap-2">
+                <button 
+                 onClick={refreshData} 
+                 className={`bg-white/20 p-2 rounded-full hover:bg-white/30 transition-colors ${isRefreshing ? 'animate-spin' : ''}`}
+                 title="Refresh Data"
+                >
+                 <RefreshCw className="w-6 h-6 text-white" />
+               </button>
+               <div className="bg-white/20 p-2 rounded-full">
+                 <Navigation className="w-6 h-6 text-white" />
+               </div>
              </div>
           </div>
           <p className="text-primary-100 text-sm">Anda boleh menutup aplikasi ini. Kembali semula apabila tiba di destinasi.</p>
@@ -275,9 +298,18 @@ const DriverView: React.FC<DriverViewProps> = ({ user, onLogout }) => {
              <h1 className="text-3xl font-bold text-white">Hello,</h1>
              <p className="text-primary-100 text-lg">{user.name}</p>
           </div>
-          <button onClick={onLogout} className="bg-white/20 text-white px-3 py-1 rounded-full text-sm backdrop-blur-sm hover:bg-white/30 transition-colors">
-            Keluar
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={refreshData} 
+              className={`bg-white/20 text-white p-2 rounded-full backdrop-blur-sm hover:bg-white/30 transition-colors ${isRefreshing ? 'animate-spin' : ''}`}
+              title="Refresh Data"
+            >
+              <RefreshCw className="w-5 h-5" />
+            </button>
+            <button onClick={onLogout} className="bg-white/20 text-white px-3 py-2 rounded-full text-sm backdrop-blur-sm hover:bg-white/30 transition-colors">
+              Keluar
+            </button>
+          </div>
         </div>
         <div className="bg-white/10 p-4 rounded-2xl backdrop-blur-md border border-white/20 text-white flex items-center gap-3">
            <Clock className="w-5 h-5" />
