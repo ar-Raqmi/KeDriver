@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, Vehicle, Trip } from '../types';
-import { getVehicles, startTrip, endTrip, getActiveTripForDriver } from '../services/storageService';
-import { Car, MapPin, Users, Fingerprint, Clock, Navigation, LogOut, AlertTriangle, CheckCircle, Loader2, StickyNote, RefreshCw } from 'lucide-react';
+import { getVehicles, startTrip, endTrip, getActiveTripForDriver, syncPendingTrips } from '../services/storageService';
+import { Car, MapPin, Users, Fingerprint, Clock, Navigation, LogOut, AlertTriangle, CheckCircle, Loader2, StickyNote, RefreshCw, WifiOff } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface DriverViewProps {
@@ -29,6 +29,7 @@ const DriverView: React.FC<DriverViewProps> = ({ user, onLogout }) => {
 
   useEffect(() => {
     initData();
+    syncPendingTrips();
   }, [user.id]);
 
   const initData = async () => {
@@ -40,23 +41,27 @@ const DriverView: React.FC<DriverViewProps> = ({ user, onLogout }) => {
   const refreshData = async () => {
     setIsRefreshing(true);
     try {
+      syncPendingTrips().catch(console.error);
       const v = await getVehicles();
       setVehicles(v);
       await loadActiveTrip();
     } catch (e) {
       console.error(e);
-      setError("Gagal menyegarkan data.");
     } finally {
       setIsRefreshing(false);
     }
   }
 
   const loadActiveTrip = async () => {
-    const existing = await getActiveTripForDriver(user.id);
-    setActiveTrip(existing);
-    if (existing) {
-      setDestination('');
-      setRemarks('');
+    try {
+      const existing = await getActiveTripForDriver(user.id);
+      setActiveTrip(existing);
+      if (existing) {
+        setDestination('');
+        setRemarks('');
+      }
+    } catch (e) {
+      console.warn("Failed to load active trip", e);
     }
   };
 
@@ -95,7 +100,7 @@ const DriverView: React.FC<DriverViewProps> = ({ user, onLogout }) => {
       setSelectedVehicleId('');
       setError('');
     } catch (e) {
-      setError("Gagal memulakan perjalanan. Periksa sambungan internet.");
+      setError("Gagal memulakan perjalanan. Sila cuba lagi.");
     } finally {
       setIsLoading(false);
     }
@@ -135,7 +140,8 @@ const DriverView: React.FC<DriverViewProps> = ({ user, onLogout }) => {
       setRemarks('');
       setShowConfirmStop(false);
     } catch (e) {
-      setError("Gagal menamatkan perjalanan. Periksa internet.");
+      console.error(e);
+      setError("Ralat tidak dijangka. Sila cuba lagi.");
     } finally {
       setIsLoading(false);
     }
