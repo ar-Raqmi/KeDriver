@@ -204,7 +204,7 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
 
     doc.autoTable({
       startY: startY,
-      head: [['Mula', 'Tamat', 'Pemandu', 'Plat', 'Model', 'Laluan', 'Penumpang', 'Catatan', 'Tempoh']],
+      head: [['Mula', 'Tamat', 'Pemandu', 'Plat', 'Jenis', 'Lokasi', 'Penumpang', 'Catatan', 'Tempoh']],
       body: tableData,
       theme: 'grid',
       headStyles: { fillColor: [245, 158, 11] }, // Amber 500
@@ -214,8 +214,8 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
         1: { cellWidth: 20 }, // Tamat
         // Pemandu
         3: { cellWidth: 20 }, // Plat
-        4: { cellWidth: 20 }, // Model
-        // Laluan
+        4: { cellWidth: 20 }, // Jenis
+        // Lokasi
         6: { cellWidth: 25 }, // Penumpang
         7: { cellWidth: 25 }, // Catatan
         8: { cellWidth: 20 }, // Tempoh
@@ -892,7 +892,7 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                           />
                         </div>
                         <div>
-                          <label className="text-xs font-bold text-gray-500">Model</label>
+                          <label className="text-xs font-bold text-gray-500">Jenis</label>
                           <input 
                             type="text" 
                             value={editingVehicle.model} 
@@ -1021,7 +1021,7 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                       <input 
                         type="text" 
                         className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white text-gray-900" 
-                        placeholder="Model"
+                        placeholder="Jenis"
                         value={newVehicleModel}
                         onChange={(e) => setNewVehicleModel(e.target.value)}
                       />
@@ -1029,7 +1029,7 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                     <input 
                       type="text"
                       className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white text-gray-900 text-sm"
-                      placeholder="Jenis (Contoh: Lori 3 Tan, Van, Kereta)"
+                      placeholder="Jenama"
                       value={newVehicleType}
                       onChange={(e) => setNewVehicleType(e.target.value)}
                     />
