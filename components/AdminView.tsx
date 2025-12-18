@@ -1013,14 +1013,15 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                   </div>
                   
                   <div className="space-y-3 pb-6 border-b border-gray-100">
+                    <input 
+                      type="text" 
+                      className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-gray-900 text-sm" 
+                      placeholder="Nama Penuh"
+                      value={newUser.name}
+                      onChange={(e) => setNewUser({...newUser, name: e.target.value})}
+                    />
+
                     <div className="grid grid-cols-2 gap-2">
-                      <input 
-                        type="text" 
-                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-gray-900 text-sm" 
-                        placeholder="Nama Penuh"
-                        value={newUser.name}
-                        onChange={(e) => setNewUser({...newUser, name: e.target.value})}
-                      />
                       <input 
                         type="text" 
                         className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-gray-900 text-sm" 
@@ -1028,14 +1029,15 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                         value={newUser.username}
                         onChange={(e) => setNewUser({...newUser, username: e.target.value})}
                       />
+                      <input 
+                        type="password" 
+                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-gray-900 text-sm" 
+                        placeholder="Kata Laluan"
+                        value={newUser.password}
+                        onChange={(e) => setNewUser({...newUser, password: e.target.value})}
+                      />
                     </div>
-                    <input 
-                      type="password" 
-                      className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-gray-900 text-sm" 
-                      placeholder="Kata Laluan"
-                      value={newUser.password}
-                      onChange={(e) => setNewUser({...newUser, password: e.target.value})}
-                    />
+
                     <button 
                       onClick={handleAddDriver}
                       disabled={loading}
