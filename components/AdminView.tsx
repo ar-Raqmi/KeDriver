@@ -38,6 +38,8 @@ interface AdminViewProps {
   onLogout: () => void;
 }
 
+type SortKey = 'startTime' | 'endTime' | 'driverName' | 'plateNumber' | 'origin' | 'status' | 'remarks';
+
 const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'settings'>('dashboard');
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -47,9 +49,10 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
   
   // Filters & Sorting
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'custom'>('all');
-  const [selectedDriverFilter, setSelectedDriverFilter] = useState('all'); // New Driver Filter
+  const [selectedDriverFilter, setSelectedDriverFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [sortKey, setSortKey] = useState<SortKey>('startTime');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
 
@@ -81,7 +84,7 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
 
   useEffect(() => {
     loadData();
-  }, [activeTab]); // Reload when tab changes
+  }, [activeTab]);
 
   const loadData = async () => {
     setLoading(true);
@@ -149,9 +152,33 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
 
     // Sorting
     return filtered.sort((a, b) => {
-      return sortOrder === 'asc' 
-        ? a.startTime - b.startTime 
-        : b.startTime - a.startTime;
+      let comparison = 0;
+      switch (sortKey) {
+        case 'startTime':
+          comparison = a.startTime - b.startTime;
+          break;
+        case 'endTime':
+          comparison = (a.endTime || 0) - (b.endTime || 0);
+          break;
+        case 'driverName':
+          comparison = a.driverName.localeCompare(b.driverName);
+          break;
+        case 'plateNumber':
+          comparison = a.plateNumber.localeCompare(b.plateNumber);
+          break;
+        case 'origin':
+          comparison = a.origin.localeCompare(b.origin);
+          break;
+        case 'status':
+          comparison = a.status.localeCompare(b.status);
+          break;
+        case 'remarks':
+          comparison = (a.remarks || '').localeCompare(b.remarks || '');
+          break;
+        default:
+          comparison = b.startTime - a.startTime;
+      }
+      return sortOrder === 'asc' ? comparison : -comparison;
     });
   };
 
@@ -163,11 +190,10 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
       return;
     }
 
-    const doc = new jspdf.jsPDF('l', 'mm', 'a4'); // Landscape for better column fit
+    const doc = new jspdf.jsPDF('l', 'mm', 'a4');
     
-    // Header
     doc.setFontSize(12);
-    doc.setTextColor(245, 158, 11); // Primary color
+    doc.setTextColor(245, 158, 11);
     doc.text("KeDriver - Laporan Perjalanan", 14, 22);
     
     doc.setFontSize(9);
@@ -175,18 +201,15 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
     doc.text(`Dijana oleh: ${user.name}`, 14, 30);
     doc.text(`Tarikh: ${format(new Date(), 'dd/MM/yyyy hh:mm a')}`, 14, 36);
 
-    // Filter Info in PDF
     if (selectedDriverFilter !== 'all') {
       const driverName = usersList.find(u => u.id === selectedDriverFilter)?.name || 'Unknown';
       doc.text(`Filter Pemandu: ${driverName}`, 14, 42);
     }
 
-    // Table
     const tableData = filteredTrips.map(t => {
        const vehicle = vehicles.find(v => v.id === t.vehicleId);
        const displayBrand = t.vehicleBrand || vehicle?.type || '-';
        const displayModel = t.vehicleModel || vehicle?.model || '-';
-       
        const formattedEndTime = t.endTime ? format(t.endTime, 'dd/MM/yyyy hh:mm a') : '-';
        
        return [
@@ -210,34 +233,40 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
       head: [['Mula', 'Tamat', 'Pemandu', 'Plat', 'Jenama', 'Jenis', 'Lokasi', 'Penumpang', 'Catatan', 'Tempoh']],
       body: tableData,
       theme: 'grid',
-      headStyles: { fillColor: [245, 158, 11] }, // Amber 500
-      styles: { fontSize: 7, cellPadding: 2 }, // Smaller font
+      headStyles: { fillColor: [245, 158, 11] },
+      styles: { fontSize: 7, cellPadding: 2 },
       columnStyles: {
-        0: { cellWidth: 20 }, // Mula
-        1: { cellWidth: 20 }, // Tamat
-        // Pemandu
-        3: { cellWidth: 20 }, // Plat
-        4: { cellWidth: 20 }, // Jenama
-        5: { cellWidth: 20 }, // Jenis
-        // Lokasi
-        7: { cellWidth: 25 }, // Penumpang
-        8: { cellWidth: 25 }, // Catatan
-        9: { cellWidth: 15 }, // Tempoh
+        0: { cellWidth: 20 },
+        1: { cellWidth: 20 },
+        3: { cellWidth: 20 },
+        4: { cellWidth: 20 },
+        5: { cellWidth: 20 },
+        7: { cellWidth: 25 },
+        8: { cellWidth: 25 },
+        9: { cellWidth: 15 },
       }
     });
 
     doc.save(`Laporan_GerakJalan_${Date.now()}.pdf`);
   };
 
-  const toggleSort = () => {
-    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortOrder('desc');
+    }
   };
 
-  // Helper for input datetime-local
+  const renderSortIcon = (key: SortKey) => {
+    if (sortKey !== key) return null;
+    return sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-primary-500" /> : <ArrowDown className="w-3 h-3 text-primary-500" />;
+  };
+
   const formatForInput = (timestamp: number) => {
     if (!timestamp) return '';
     const d = new Date(timestamp);
-    // Pad to ISO format: YYYY-MM-DDThh:mm
     const pad = (n: number) => n < 10 ? '0'+n : n;
     return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
@@ -248,8 +277,6 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
     setEditTripEndStr(trip.endTime ? formatForInput(trip.endTime) : '');
   };
 
-  // --- CRUD HANDLERS ---
-
   const handleUpdateTrip = async () => {
     if (!editingTrip) return;
 
@@ -258,15 +285,12 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
     let durationMinutes = editingTrip.durationMinutes;
     let status = editingTrip.status;
 
-    // Logic to handle dates and duration updates
     if (editTripEndStr) {
         endTime = new Date(editTripEndStr).getTime();
-        // Recalculate duration
         const durationMs = endTime - startTime;
         durationMinutes = Math.max(1, Math.round(durationMs / 60000));
         status = 'COMPLETED';
     } else {
-        // If end time is cleared, set back to active
         endTime = undefined;
         durationMinutes = undefined;
         status = 'ACTIVE';
@@ -292,16 +316,13 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
 
   const confirmDeleteTrip = async () => {
     if (!tripToDelete) return;
-    
     try {
         await deleteTrip(tripToDelete);
-        // Optimistic update
         setTrips(currentTrips => currentTrips.filter(t => t.id !== tripToDelete));
         setTripToDelete(null);
     } catch (e: any) {
         console.error("Delete Trip Error:", e);
         alert("Gagal memadam: " + e.message);
-        // Reload if failed just in case
         await loadData();
         setTripToDelete(null);
     }
@@ -311,7 +332,7 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
     if (!newVehiclePlate || !newVehicleModel) return;
     try {
       await addVehicle({
-        id: '', // Generated by DB
+        id: '',
         plateNumber: newVehiclePlate.toUpperCase(),
         model: newVehicleModel,
         type: newVehicleType || 'Kenderaan'
@@ -333,7 +354,7 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
     }
     try {
       await addUser({
-        id: '', // Generated by DB
+        id: '',
         name: newUser.name,
         username: newUser.username,
         password: newUser.password,
@@ -535,7 +556,7 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                                           vehicleId: v.id, 
                                           plateNumber: v.plateNumber, 
                                           vehicleModel: v.model,
-                                          vehicleBrand: v.type
+                                          vehicleBrand: v.type 
                                       });
                                   }}
                                   className="w-full border p-2 rounded-lg bg-gray-50 text-gray-900 text-sm"
@@ -727,19 +748,67 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                       <tr>
                         <th 
                           className="px-6 py-4 text-xs font-bold text-gray-500 uppercase cursor-pointer hover:bg-amber-100/50 transition-colors group select-none whitespace-nowrap"
-                          onClick={toggleSort}
+                          onClick={() => handleSort('startTime')}
                         >
                           <div className="flex items-center gap-1">
                             Mula
-                            {sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-primary-500" /> : <ArrowDown className="w-3 h-3 text-primary-500" />}
+                            {renderSortIcon('startTime')}
                           </div>
                         </th>
-                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase whitespace-nowrap">Tamat</th>
-                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Pemandu</th>
-                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Kenderaan</th>
-                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Perjalanan</th>
-                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Catatan</th>
-                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Status</th>
+                        <th 
+                          className="px-6 py-4 text-xs font-bold text-gray-500 uppercase cursor-pointer hover:bg-amber-100/50 transition-colors group select-none whitespace-nowrap"
+                          onClick={() => handleSort('endTime')}
+                        >
+                          <div className="flex items-center gap-1">
+                            Tamat
+                            {renderSortIcon('endTime')}
+                          </div>
+                        </th>
+                        <th 
+                          className="px-6 py-4 text-xs font-bold text-gray-500 uppercase cursor-pointer hover:bg-amber-100/50 transition-colors group select-none whitespace-nowrap"
+                          onClick={() => handleSort('driverName')}
+                        >
+                          <div className="flex items-center gap-1">
+                            Pemandu
+                            {renderSortIcon('driverName')}
+                          </div>
+                        </th>
+                        <th 
+                          className="px-6 py-4 text-xs font-bold text-gray-500 uppercase cursor-pointer hover:bg-amber-100/50 transition-colors group select-none whitespace-nowrap"
+                          onClick={() => handleSort('plateNumber')}
+                        >
+                          <div className="flex items-center gap-1">
+                            Kenderaan
+                            {renderSortIcon('plateNumber')}
+                          </div>
+                        </th>
+                        <th 
+                          className="px-6 py-4 text-xs font-bold text-gray-500 uppercase cursor-pointer hover:bg-amber-100/50 transition-colors group select-none whitespace-nowrap"
+                          onClick={() => handleSort('origin')}
+                        >
+                          <div className="flex items-center gap-1">
+                            Perjalanan
+                            {renderSortIcon('origin')}
+                          </div>
+                        </th>
+                        <th 
+                          className="px-6 py-4 text-xs font-bold text-gray-500 uppercase cursor-pointer hover:bg-amber-100/50 transition-colors group select-none whitespace-nowrap"
+                          onClick={() => handleSort('remarks')}
+                        >
+                          <div className="flex items-center gap-1">
+                            Catatan
+                            {renderSortIcon('remarks')}
+                          </div>
+                        </th>
+                        <th 
+                          className="px-6 py-4 text-xs font-bold text-gray-500 uppercase cursor-pointer hover:bg-amber-100/50 transition-colors group select-none whitespace-nowrap"
+                          onClick={() => handleSort('status')}
+                        >
+                          <div className="flex items-center gap-1">
+                            Status
+                            {renderSortIcon('status')}
+                          </div>
+                        </th>
                         <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase text-center">Tindakan</th>
                       </tr>
                     </thead>
@@ -818,7 +887,7 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                               <button 
                                 type="button"
                                 onClick={(e) => {
-                                    e.stopPropagation(); // Prevent any row click events
+                                    e.stopPropagation();
                                     setTripToDelete(trip.id);
                                 }}
                                 className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors cursor-pointer"
@@ -847,7 +916,6 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
           {activeTab === 'settings' && (
             <div className="grid md:grid-cols-2 gap-6 max-w-6xl mx-auto">
               
-              {/* EDIT USER MODAL */}
               {editingUser && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
                   <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
@@ -894,7 +962,6 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                 </div>
               )}
 
-              {/* EDIT VEHICLE MODAL */}
               {editingVehicle && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
                   <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
@@ -937,7 +1004,6 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                 </div>
               )}
 
-              {/* Manage Users Card */}
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-amber-100 flex flex-col h-[650px]">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
@@ -946,7 +1012,6 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                     <h3 className="text-lg font-bold text-gray-800">Pengurusan Pemandu</h3>
                   </div>
                   
-                  {/* Add User */}
                   <div className="space-y-3 pb-6 border-b border-gray-100">
                     <div className="grid grid-cols-2 gap-2">
                       <input 
@@ -980,7 +1045,6 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                     </button>
                   </div>
 
-                  {/* List Users */}
                   <div className="mt-4 flex-1 overflow-y-auto pr-2 custom-scrollbar">
                     <h4 className="text-xs font-bold text-gray-400 uppercase mb-3">Senarai Pengguna ({usersList.length})</h4>
                     <div className="space-y-2">
@@ -1017,7 +1081,6 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                   </div>
               </div>
 
-              {/* Manage Vehicles Card */}
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-amber-100 flex flex-col h-[650px]">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="p-2 bg-primary-100 rounded-lg text-primary-600">
@@ -1026,7 +1089,6 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                     <h3 className="text-lg font-bold text-gray-800">Pengurusan Kenderaan</h3>
                   </div>
                   
-                  {/* Add Vehicle */}
                   <div className="space-y-3 pb-6 border-b border-gray-100">
                     <div className="grid grid-cols-2 gap-2">
                       <input 
@@ -1060,7 +1122,6 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                     </button>
                   </div>
 
-                  {/* List Vehicles */}
                   <div className="mt-4 flex-1 overflow-y-auto pr-2 custom-scrollbar">
                     <h4 className="text-xs font-bold text-gray-400 uppercase mb-3">Senarai Kenderaan ({vehicles.length})</h4>
                     <div className="space-y-2">
