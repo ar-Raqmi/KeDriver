@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Vehicle, Trip } from '../types';
 import { getVehicles, startTrip, endTrip, getActiveTripForDriver, syncPendingTrips } from '../services/storageService';
-import { Car, MapPin, Users, Fingerprint, Clock, Navigation, LogOut, AlertTriangle, CheckCircle, Loader2, StickyNote, RefreshCw, WifiOff } from 'lucide-react';
+import { Car, MapPin, Users, Fingerprint, Clock, Navigation, LogOut, AlertTriangle, CheckCircle, Loader2, StickyNote, RefreshCw, WifiOff, Search, X } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface DriverViewProps {
@@ -20,6 +20,7 @@ const DriverView: React.FC<DriverViewProps> = ({ user, onLogout }) => {
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
   const [origin, setOrigin] = useState('');
   const [passengers, setPassengers] = useState('');
+  const [vehicleSearchQuery, setVehicleSearchQuery] = useState('');
 
   // End Form State
   const [destination, setDestination] = useState('');
@@ -65,6 +66,15 @@ const DriverView: React.FC<DriverViewProps> = ({ user, onLogout }) => {
     }
   };
 
+  const filteredVehicles = vehicles.filter(v => {
+    const query = vehicleSearchQuery.toLowerCase();
+    return (
+      v.plateNumber.toLowerCase().includes(query) ||
+      v.model.toLowerCase().includes(query) ||
+      v.type.toLowerCase().includes(query)
+    );
+  });
+
   const handleThumbIn = async () => {
     if (!selectedVehicleId || !origin) {
       setError("Sila pilih kenderaan dan lokasi mula.");
@@ -99,6 +109,7 @@ const DriverView: React.FC<DriverViewProps> = ({ user, onLogout }) => {
       setOrigin('');
       setPassengers('');
       setSelectedVehicleId('');
+      setVehicleSearchQuery('');
       setError('');
     } catch (e) {
       setError("Gagal memulakan perjalanan. Sila cuba lagi.");
@@ -330,31 +341,58 @@ const DriverView: React.FC<DriverViewProps> = ({ user, onLogout }) => {
         <div className="bg-white rounded-3xl shadow-xl p-6 space-y-6">
           
           {/* Vehicle Selector */}
-          <div className="space-y-2">
-            <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-              <Car className="w-4 h-4 text-primary-500" /> Pilih Kenderaan
-            </label>
-            <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto">
-              {vehicles.length > 0 ? vehicles.map(v => (
+          <div className="space-y-4">
+            <div className="flex flex-col gap-3">
+              <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                <Car className="w-4 h-4 text-primary-500" /> Pilih Kenderaan
+              </label>
+              
+              {/* Vehicle Search Box */}
+              <div className="relative w-full">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                  <Search className="w-5 h-5" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Cari No Plat atau Jenis Kenderaan..."
+                  value={vehicleSearchQuery}
+                  onChange={(e) => setVehicleSearchQuery(e.target.value)}
+                  className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 focus:border-primary-500 focus:bg-white focus:ring-4 focus:ring-primary-100 rounded-2xl text-base font-medium outline-none transition-all shadow-sm placeholder:text-gray-400"
+                />
+                {vehicleSearchQuery && (
+                   <button 
+                    onClick={() => setVehicleSearchQuery('')}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
+                   >
+                     <X className="w-4 h-4" />
+                   </button>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2 max-h-56 overflow-y-auto pr-1">
+              {filteredVehicles.length > 0 ? filteredVehicles.map(v => (
                 <button
                   type="button"
                   key={v.id}
                   onClick={() => setSelectedVehicleId(v.id)}
-                  className={`p-3 rounded-xl border text-left transition-all ${
+                  className={`p-4 rounded-xl border text-left transition-all ${
                     selectedVehicleId === v.id 
                     ? 'border-primary-500 bg-primary-50 ring-2 ring-primary-200' 
                     : 'border-gray-200 hover:border-primary-300'
                   }`}
                 >
                   <div className="flex justify-between items-center">
-                    <div className="font-bold text-gray-800">{v.plateNumber}</div>
-                    <div className="text-xs font-bold text-primary-600 bg-primary-50 px-2 py-0.5 rounded">{v.type}</div>
+                    <div className="font-bold text-lg text-gray-800 tracking-tight">{v.plateNumber}</div>
+                    <div className="text-xs font-bold text-primary-600 bg-primary-100 px-2 py-1 rounded-md uppercase">{v.type}</div>
                   </div>
-                  <div className="text-xs text-gray-500">{v.model}</div>
+                  <div className="text-sm text-gray-500 mt-0.5">{v.model}</div>
                 </button>
               )) : (
-                <div className="text-center p-4 text-gray-400 text-sm bg-gray-50 rounded-lg">
-                  {isLoading ? 'Memuatkan kenderaan...' : 'Tiada kenderaan didaftarkan.'}
+                <div className="text-center p-8 text-gray-400 text-sm bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                  {vehicles.length === 0 
+                    ? (isLoading ? 'Memuatkan kenderaan...' : 'Tiada kenderaan didaftarkan.')
+                    : 'Tiada kenderaan yang sepadan dengan carian anda.'}
                 </div>
               )}
             </div>
@@ -364,15 +402,15 @@ const DriverView: React.FC<DriverViewProps> = ({ user, onLogout }) => {
           <div className="space-y-4">
              <div className="relative">
                 <label className="text-sm font-bold text-gray-700 mb-2 block">Lokasi Mula</label>
-                <div className="absolute left-3 top-9 text-gray-400">
-                  <div className="w-2 h-2 rounded-full bg-green-500 ring-4 ring-green-100"></div>
+                <div className="absolute left-4 top-11 text-gray-400">
+                  <div className="w-2.5 h-2.5 rounded-full bg-green-500 ring-4 ring-green-100"></div>
                 </div>
                 <input 
                   type="text" 
                   value={origin}
                   onChange={e => setOrigin(e.target.value)}
-                  placeholder="Dari mana?"
-                  className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
+                  placeholder="Dari mana anda bermula?"
+                  className="w-full pl-11 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 text-base font-medium"
                 />
              </div>
           </div>
@@ -380,21 +418,21 @@ const DriverView: React.FC<DriverViewProps> = ({ user, onLogout }) => {
           {/* Passengers */}
           <div className="space-y-2">
             <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-              <Users className="w-4 h-4 text-primary-500" /> Penumpang
+              <Users className="w-4 h-4 text-primary-500" /> Penumpang (Pilihan)
             </label>
             <input 
               type="text" 
               value={passengers}
               onChange={e => setPassengers(e.target.value)}
-              placeholder="Nama penumpang / VIP"
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900"
+              placeholder="Nama penumpang / Bilangan"
+              className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900 text-base font-medium"
             />
           </div>
 
           {/* Error Message for Thumb In */}
           {error && !activeTrip && (
-            <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm font-bold flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4" /> {error}
+            <div className="p-4 bg-red-50 text-red-600 rounded-xl text-sm font-bold flex items-center gap-2 border border-red-100">
+              <AlertTriangle className="w-5 h-5" /> {error}
             </div>
           )}
 
@@ -403,9 +441,9 @@ const DriverView: React.FC<DriverViewProps> = ({ user, onLogout }) => {
              type="button"
              onClick={handleThumbIn}
              disabled={isLoading}
-             className="w-full py-4 bg-primary-500 hover:bg-primary-600 active:bg-primary-700 text-white rounded-2xl font-bold text-lg shadow-lg shadow-primary-500/30 transition-all flex items-center justify-center gap-2 mt-4 disabled:opacity-50"
+             className="w-full py-5 bg-primary-500 hover:bg-primary-600 active:bg-primary-700 text-white rounded-2xl font-bold text-xl shadow-lg shadow-primary-500/30 transition-all flex items-center justify-center gap-3 mt-4 disabled:opacity-50"
            >
-             {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : <Fingerprint className="w-6 h-6" />}
+             {isLoading ? <Loader2 className="w-7 h-7 animate-spin" /> : <Fingerprint className="w-7 h-7" />}
              {isLoading ? 'SEDANG DIPROSES...' : 'MULA MEMANDU'}
            </button>
 
