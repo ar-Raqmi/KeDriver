@@ -9,7 +9,8 @@ import {
   deleteDoc, 
   doc, 
   query, 
-  where
+  where,
+  getDoc
 } from 'firebase/firestore';
 
 // Collection Names
@@ -17,12 +18,11 @@ const COLL_USERS = 'users';
 const COLL_VEHICLES = 'vehicles';
 const COLL_TRIPS = 'trips';
 
-// Local Storage Keys
+// Local Storage Keys (For Local Mode only)
 const LS_KEYS = {
   USERS: 'kedriver_users',
   VEHICLES: 'kedriver_vehicles',
-  TRIPS: 'kedriver_trips',
-  PENDING_COMPLETIONS: 'kedriver_pending_completions'
+  TRIPS: 'kedriver_trips'
 };
 
 const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
@@ -46,52 +46,8 @@ const setLocal = (key: string, data: any[]) => {
   }
 };
 
-const savePendingCompletion = (trip: Trip) => {
-  const pending = getLocal<Trip>(LS_KEYS.PENDING_COMPLETIONS);
-  const index = pending.findIndex(p => p.id === trip.id);
-  if (index !== -1) {
-    pending[index] = trip;
-  } else {
-    pending.push(trip);
-  }
-  setLocal(LS_KEYS.PENDING_COMPLETIONS, pending);
-};
-
-const getPendingCompletions = (): Trip[] => {
-  return getLocal<Trip>(LS_KEYS.PENDING_COMPLETIONS);
-};
-
-export const syncPendingTrips = async () => {
-  if (!db) return;
-  
-  const pending = getPendingCompletions();
-  if (pending.length === 0) return;
-
-  console.log(`Attempting to sync ${pending.length} pending trips...`);
-  const remaining: Trip[] = [];
-
-  for (const trip of pending) {
-    try {
-      if (!trip.id) continue;
-      const ref = doc(db, COLL_TRIPS, trip.id);
-      const { id, ...data } = trip;
-      await updateDoc(ref, data);
-      console.log(`Synced trip ${trip.id}`);
-    } catch (e) {
-      console.error(`Failed to sync trip ${trip.id}`, e);
-      remaining.push(trip);
-    }
-  }
-
-  setLocal(LS_KEYS.PENDING_COMPLETIONS, remaining);
-};
-
 // --- INITIALIZATION ---
 export const checkAndSeedAdmin = async () => {
-  if (db) {
-     syncPendingTrips().catch(console.error);
-  }
-
   if (db) {
     // --- CLOUD MODE ---
     try {
@@ -128,6 +84,10 @@ export const checkAndSeedAdmin = async () => {
   }
 };
 
+export const syncPendingTrips = async () => {
+  return;
+};
+
 // --- USERS ---
 export const getUsers = async (): Promise<User[]> => {
   if (db) {
@@ -139,7 +99,6 @@ export const getUsers = async (): Promise<User[]> => {
 };
 
 export const addUser = async (user: User) => {
-  // Check duplicate username locally before adding
   const users = await getUsers();
   if (users.some(u => u.username === user.username)) {
     throw new Error("Nama pengguna sudah wujud.");
@@ -245,21 +204,12 @@ export const getActiveTripForDriver = async (driverId: string): Promise<Trip | n
         where("status", "==", "ACTIVE")
       );
       const snapshot = await getDocs(q);
-      if (!snapshot.empty) {
-        const docData = snapshot.docs[0];
-        const trip = { id: docData.id, ...docData.data() as any } as Trip;
-        const pending = getPendingCompletions();
-        const isPendingCompletion = pending.some(p => p.id === trip.id && p.status === 'COMPLETED');
-        
-        if (isPendingCompletion) {
-          console.log("Trip found in pending completions, treating as null");
-          return null;
-        }
 
-        return trip;
+      if (!snapshot.empty) {
+        return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() as any } as Trip;
       }
     } catch (e) {
-      console.warn("Error fetching active trip, trying to proceed with null", e);
+      console.warn("Error fetching active trip", e);
       return null;
     }
     return null;
@@ -272,25 +222,23 @@ export const getActiveTripForDriver = async (driverId: string): Promise<Trip | n
 export const startTrip = async (trip: Trip) => {
   if (db) {
     const { id, ...data } = trip;
-    await addDoc(collection(db, COLL_TRIPS), data);
+    const docRef = await addDoc(collection(db, COLL_TRIPS), data);
+    return docRef.id;
   } else {
     const trips = getLocal<Trip>(LS_KEYS.TRIPS);
-    trips.push({ ...trip, id: generateId() });
+    const newId = generateId();
+    trips.push({ ...trip, id: newId });
     setLocal(LS_KEYS.TRIPS, trips);
+    return newId;
   }
 };
 
 export const endTrip = async (trip: Trip) => {
   if (db) {
     if (!trip.id) return;
-    try {
-      const ref = doc(db, COLL_TRIPS, trip.id);
-      const { id, ...data } = trip;
-      await updateDoc(ref, data);
-    } catch (e) {
-      console.warn("Cloud endTrip failed. Saving to local fallback queue.", e);
-      savePendingCompletion(trip);
-    }
+    const ref = doc(db, COLL_TRIPS, trip.id);
+    const { id, ...data } = trip;
+    await updateDoc(ref, data);
   } else {
     const trips = getLocal<Trip>(LS_KEYS.TRIPS);
     const index = trips.findIndex(t => t.id === trip.id);

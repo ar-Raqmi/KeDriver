@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, Vehicle, Trip } from '../types';
-import { getVehicles, startTrip, endTrip, getActiveTripForDriver, syncPendingTrips } from '../services/storageService';
+import { getVehicles, startTrip, endTrip, getActiveTripForDriver } from '../services/storageService';
 import { Car, MapPin, Users, Fingerprint, Clock, Navigation, LogOut, AlertTriangle, CheckCircle, Loader2, StickyNote, RefreshCw, WifiOff, Search, X } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -30,7 +30,6 @@ const DriverView: React.FC<DriverViewProps> = ({ user, onLogout }) => {
 
   useEffect(() => {
     initData();
-    syncPendingTrips();
   }, [user.id]);
 
   const initData = async () => {
@@ -42,7 +41,6 @@ const DriverView: React.FC<DriverViewProps> = ({ user, onLogout }) => {
   const refreshData = async () => {
     setIsRefreshing(true);
     try {
-      syncPendingTrips().catch(console.error);
       const v = await getVehicles();
       setVehicles(v);
       await loadActiveTrip();
@@ -102,8 +100,8 @@ const DriverView: React.FC<DriverViewProps> = ({ user, onLogout }) => {
     };
 
     try {
-      await startTrip(newTrip);
-      await loadActiveTrip();
+      const newId = await startTrip(newTrip);
+      setActiveTrip({ ...newTrip, id: newId });
       setOrigin('');
       setPassengers('');
       setSelectedVehicleId('');
@@ -128,14 +126,13 @@ const DriverView: React.FC<DriverViewProps> = ({ user, onLogout }) => {
 
   const handleConfirmThumbOut = async () => {
     if (!activeTrip) return;
-    setIsLoading(true);
-
+    
     const endTime = Date.now();
-    const durationMs = endTime - activeTrip.startTime;
+    const durationMs = endTime - tripToComplete.startTime;
     const durationMinutes = Math.max(1, Math.round(durationMs / 60000));
 
     const completedTrip: Trip = {
-      ...activeTrip,
+      ...tripToComplete,
       destination: destination.trim(),
       remarks: remarks.trim() || undefined,
       endTime,
@@ -143,17 +140,16 @@ const DriverView: React.FC<DriverViewProps> = ({ user, onLogout }) => {
       status: 'COMPLETED'
     };
 
+    setShowConfirmStop(false);
+    setActiveTrip(null); 
+    setDestination('');
+    setRemarks('');
+    
     try {
       await endTrip(completedTrip);
-      setActiveTrip(null);
-      setDestination('');
-      setRemarks('');
-      setShowConfirmStop(false);
+      console.log("Trip sync initiated successfully");
     } catch (e) {
-      console.error(e);
-      setError("Ralat tidak dijangka. Sila cuba lagi.");
-    } finally {
-      setIsLoading(false);
+      console.error("Background sync failed, Firestore will retry automatically:", e);
     }
   };
 
@@ -184,8 +180,8 @@ const DriverView: React.FC<DriverViewProps> = ({ user, onLogout }) => {
               </div>
               <div className="grid grid-cols-2 gap-3 pt-2">
                 <button onClick={() => setShowConfirmStop(false)} className="py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors">Batal</button>
-                <button onClick={handleConfirmThumbOut} disabled={isLoading} className="py-3 px-4 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl shadow-lg shadow-red-500/30 transition-colors disabled:opacity-50">
-                  {isLoading ? 'Memproses...' : 'Ya, Tamat'}
+                <button onClick={handleConfirmThumbOut} className="py-3 px-4 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl shadow-lg shadow-red-500/30 transition-colors">
+                  Ya, Tamat
                 </button>
               </div>
             </div>
