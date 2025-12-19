@@ -13,12 +13,10 @@ import {
   getDoc
 } from 'firebase/firestore';
 
-// Collection Names
 const COLL_USERS = 'users';
 const COLL_VEHICLES = 'vehicles';
 const COLL_TRIPS = 'trips';
 
-// Local Storage Keys (For Local Mode only)
 const LS_KEYS = {
   USERS: 'kedriver_users',
   VEHICLES: 'kedriver_vehicles',
@@ -27,13 +25,11 @@ const LS_KEYS = {
 
 const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
 
-// Helper: Get Local Data
 const getLocal = <T>(key: string): T[] => {
   try {
     const data = localStorage.getItem(key);
     return data ? JSON.parse(data) : [];
   } catch (e) {
-    console.error("Error reading local storage", e);
     return [];
   }
 };
@@ -41,19 +37,14 @@ const getLocal = <T>(key: string): T[] => {
 const setLocal = (key: string, data: any[]) => {
   try {
     localStorage.setItem(key, JSON.stringify(data));
-  } catch (e) {
-    console.error("Error writing to local storage", e);
-  }
+  } catch (e) {}
 };
 
-// --- INITIALIZATION ---
 export const checkAndSeedAdmin = async () => {
   if (db) {
-    // --- CLOUD MODE ---
     try {
       const q = query(collection(db, COLL_USERS), where("role", "==", UserRole.HEAD_DRIVER));
       const querySnapshot = await getDocs(q);
-      
       if (querySnapshot.empty) {
         await addDoc(collection(db, COLL_USERS), {
            name: 'Admin', 
@@ -61,49 +52,32 @@ export const checkAndSeedAdmin = async () => {
            password: 'password123', 
            role: UserRole.HEAD_DRIVER 
         });
-        console.log("Cloud: Default admin created");
       }
-    } catch (e) {
-      console.error("Cloud Error seeding admin:", e);
-    }
+    } catch (e) {}
   } else {
-    // --- LOCAL MODE ---
     const users = getLocal<User>(LS_KEYS.USERS);
     if (!users.some(u => u.role === UserRole.HEAD_DRIVER)) {
-      const admin: User = {
+      users.push({
          id: 'admin_local',
          name: 'Admin', 
          username: 'admin', 
          password: 'password123', 
          role: UserRole.HEAD_DRIVER 
-      };
-      users.push(admin);
+      });
       setLocal(LS_KEYS.USERS, users);
-      console.log("Local: Default admin created");
     }
   }
 };
 
-export const syncPendingTrips = async () => {
-  return;
-};
-
-// --- USERS ---
 export const getUsers = async (): Promise<User[]> => {
   if (db) {
     const snapshot = await getDocs(collection(db, COLL_USERS));
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any } as User));
-  } else {
-    return getLocal<User>(LS_KEYS.USERS);
   }
+  return getLocal<User>(LS_KEYS.USERS);
 };
 
 export const addUser = async (user: User) => {
-  const users = await getUsers();
-  if (users.some(u => u.username === user.username)) {
-    throw new Error("Nama pengguna sudah wujud.");
-  }
-
   if (db) {
     const { id, ...userData } = user; 
     await addDoc(collection(db, COLL_USERS), userData);
@@ -134,19 +108,16 @@ export const deleteUser = async (userId: string) => {
     await deleteDoc(doc(db, COLL_USERS, userId));
   } else {
     const users = getLocal<User>(LS_KEYS.USERS);
-    const filtered = users.filter(u => u.id !== userId);
-    setLocal(LS_KEYS.USERS, filtered);
+    setLocal(LS_KEYS.USERS, users.filter(u => u.id !== userId));
   }
 };
 
-// --- VEHICLES ---
 export const getVehicles = async (): Promise<Vehicle[]> => {
   if (db) {
     const snapshot = await getDocs(collection(db, COLL_VEHICLES));
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any } as Vehicle));
-  } else {
-    return getLocal<Vehicle>(LS_KEYS.VEHICLES);
   }
+  return getLocal<Vehicle>(LS_KEYS.VEHICLES);
 };
 
 export const addVehicle = async (vehicle: Vehicle) => {
@@ -180,19 +151,16 @@ export const deleteVehicle = async (vehicleId: string) => {
     await deleteDoc(doc(db, COLL_VEHICLES, vehicleId));
   } else {
     const vehicles = getLocal<Vehicle>(LS_KEYS.VEHICLES);
-    const filtered = vehicles.filter(v => v.id !== vehicleId);
-    setLocal(LS_KEYS.VEHICLES, filtered);
+    setLocal(LS_KEYS.VEHICLES, vehicles.filter(v => v.id !== vehicleId));
   }
 };
 
-// --- TRIPS ---
 export const getTrips = async (): Promise<Trip[]> => {
   if (db) {
     const snapshot = await getDocs(collection(db, COLL_TRIPS));
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any } as Trip));
-  } else {
-    return getLocal<Trip>(LS_KEYS.TRIPS);
   }
+  return getLocal<Trip>(LS_KEYS.TRIPS);
 };
 
 export const getActiveTripForDriver = async (driverId: string): Promise<Trip | null> => {
@@ -204,19 +172,16 @@ export const getActiveTripForDriver = async (driverId: string): Promise<Trip | n
         where("status", "==", "ACTIVE")
       );
       const snapshot = await getDocs(q);
-
       if (!snapshot.empty) {
         return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() as any } as Trip;
       }
     } catch (e) {
-      console.warn("Error fetching active trip", e);
       return null;
     }
     return null;
-  } else {
-    const trips = getLocal<Trip>(LS_KEYS.TRIPS);
-    return trips.find(t => t.driverId === driverId && t.status === 'ACTIVE') || null;
   }
+  const trips = getLocal<Trip>(LS_KEYS.TRIPS);
+  return trips.find(t => t.driverId === driverId && t.status === 'ACTIVE') || null;
 };
 
 export const startTrip = async (trip: Trip) => {
@@ -224,44 +189,40 @@ export const startTrip = async (trip: Trip) => {
     const { id, ...data } = trip;
     const docRef = await addDoc(collection(db, COLL_TRIPS), data);
     return docRef.id;
-  } else {
-    const trips = getLocal<Trip>(LS_KEYS.TRIPS);
-    const newId = generateId();
-    trips.push({ ...trip, id: newId });
-    setLocal(LS_KEYS.TRIPS, trips);
-    return newId;
   }
-};
-
-export const endTrip = async (trip: Trip) => {
-  if (db) {
-    if (!trip.id) return;
-    const ref = doc(db, COLL_TRIPS, trip.id);
-    const { id, ...data } = trip;
-    await updateDoc(ref, data);
-  } else {
-    const trips = getLocal<Trip>(LS_KEYS.TRIPS);
-    const index = trips.findIndex(t => t.id === trip.id);
-    if (index !== -1) {
-      trips[index] = trip;
-      setLocal(LS_KEYS.TRIPS, trips);
-    }
-  }
+  const trips = getLocal<Trip>(LS_KEYS.TRIPS);
+  const newId = generateId();
+  trips.push({ ...trip, id: newId });
+  setLocal(LS_KEYS.TRIPS, trips);
+  return newId;
 };
 
 export const updateTrip = async (updatedTrip: Trip) => {
+  if (!updatedTrip.id) throw new Error("ID trip tidak dijumpai");
+  
+  const cleanData: any = {};
+  Object.keys(updatedTrip).forEach(key => {
+    const val = (updatedTrip as any)[key];
+    if (val !== undefined && key !== 'id') {
+      cleanData[key] = val;
+    }
+  });
+
   if (db) {
     const ref = doc(db, COLL_TRIPS, updatedTrip.id);
-    const { id, ...data } = updatedTrip;
-    await updateDoc(ref, data);
+    await updateDoc(ref, cleanData);
   } else {
     const trips = getLocal<Trip>(LS_KEYS.TRIPS);
     const index = trips.findIndex(t => t.id === updatedTrip.id);
     if (index !== -1) {
-      trips[index] = updatedTrip;
+      trips[index] = { ...updatedTrip };
       setLocal(LS_KEYS.TRIPS, trips);
     }
   }
+};
+
+export const endTrip = async (trip: Trip) => {
+  return updateTrip(trip);
 };
 
 export const deleteTrip = async (tripId: string) => {
@@ -269,7 +230,6 @@ export const deleteTrip = async (tripId: string) => {
     await deleteDoc(doc(db, COLL_TRIPS, tripId));
   } else {
     const trips = getLocal<Trip>(LS_KEYS.TRIPS);
-    const filtered = trips.filter(t => t.id !== tripId);
-    setLocal(LS_KEYS.TRIPS, filtered);
+    setLocal(LS_KEYS.TRIPS, trips.filter(t => t.id !== tripId));
   }
 };
