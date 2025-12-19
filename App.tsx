@@ -18,7 +18,6 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Seed admin if DB is new
     checkAndSeedAdmin();
   }, []);
 
@@ -28,7 +27,6 @@ const App: React.FC = () => {
     setLoading(true);
 
     try {
-      // Fetch users from cloud to verify login
       const users = await getUsers();
       const user = users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === password);
       
@@ -166,9 +164,9 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="font-sans antialiased text-gray-900 flex flex-col h-screen">
+    <div className="font-sans antialiased text-gray-900 flex flex-col h-screen overflow-hidden">
       <DemoBanner />
-      <div className="flex-1 overflow-hidden">
+      <div className={`flex-1 ${currentUser.role === UserRole.HEAD_DRIVER ? 'overflow-hidden' : 'overflow-y-auto'}`}>
         {currentUser.role === UserRole.HEAD_DRIVER ? (
           <AdminView user={currentUser} onLogout={handleLogout} />
         ) : (
