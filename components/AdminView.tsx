@@ -1,18 +1,18 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, Trip, Vehicle, UserRole } from '../types';
-import { 
-  getTrips, getVehicles, getUsers, addVehicle, addUser, 
+import {
+  getTrips, getVehicles, getUsers, addVehicle, addUser,
   updateUser, deleteUser, updateVehicle, deleteVehicle,
-  updateTrip, deleteTrip 
+  updateTrip, deleteTrip
 } from '../services/storageService';
-import { 
-  LayoutDashboard, 
-  Settings, 
-  Download, 
-  Search, 
-  Truck, 
-  UserPlus, 
+import {
+  LayoutDashboard,
+  Settings,
+  Download,
+  Search,
+  Truck,
+  UserPlus,
   Plus,
   ArrowUp,
   ArrowDown,
@@ -38,6 +38,103 @@ interface AdminViewProps {
   onLogout: () => void;
 }
 
+// Helper component for strict dd/mm/yyyy date input
+const StrictDateInput: React.FC<{
+  label?: string;
+  value: string;
+  onChange: (val: string) => void;
+  className?: string;
+}> = ({ label, value, onChange, className }) => {
+  // convert yyyy-mm-dd to dd/mm/yyyy
+  const toDisplay = (val: string) => {
+    if (!val) return '';
+    const [y, m, d] = val.split('-');
+    return `${d}/${m}/${y}`;
+  };
+
+  // convert dd/mm/yyyy to yyyy-mm-dd
+  const fromDisplay = (val: string) => {
+    const parts = val.split('/');
+    if (parts.length === 3) {
+      const [d, m, y] = parts;
+      if (y.length === 4 && m.length === 2 && d.length === 2) {
+        return `${y}-${m}-${d}`;
+      }
+    }
+    return val;
+  };
+
+  const [localValue, setLocalValue] = React.useState(toDisplay(value));
+
+  React.useEffect(() => {
+    setLocalValue(toDisplay(value));
+  }, [value]);
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let val = e.target.value.replace(/[^0-9/]/g, '');
+    // Auto add slashes
+    if (val.length === 2 && !val.includes('/')) val += '/';
+    if (val.length === 5 && val.split('/').length === 2) val += '/';
+    if (val.length > 10) val = val.substring(0, 10);
+
+    setLocalValue(val);
+    if (val.length === 10) {
+      const parsed = fromDisplay(val);
+      if (parsed !== val) onChange(parsed);
+    }
+  };
+
+  const dateInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleIconClick = () => {
+    if (dateInputRef.current) {
+      // Modern browsers support showPicker()
+      if (typeof dateInputRef.current.showPicker === 'function') {
+        dateInputRef.current.showPicker();
+      } else {
+        // Fallback
+        dateInputRef.current.focus();
+        dateInputRef.current.click();
+      }
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      {label && <span className="text-sm text-gray-600 font-medium">{label}</span>}
+      <div className="relative flex items-center">
+        <input
+          type="text"
+          value={localValue}
+          onChange={handleTextChange}
+          placeholder="dd/mm/yyyy"
+          className={`border rounded px-2 py-1 text-sm bg-white text-gray-900 w-36 pr-8 ${className}`}
+        />
+        {/* 
+            Hidden input is positioned over the icon to ensure correct anchoring 
+            for showPicker(), but pointer-events-none ensures clicks go to the button 
+        */}
+        <input
+          ref={dateInputRef}
+          type="date"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="absolute right-2 top-1.5 w-4 h-4 opacity-0 pointer-events-none -z-10"
+          tabIndex={-1}
+        />
+        <button
+          type="button"
+          onClick={handleIconClick}
+          className="absolute right-2 p-1 text-gray-400 hover:text-primary-500 transition-colors"
+        >
+          <Calendar className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+
 type SortKey = 'startTime' | 'endTime' | 'driverName' | 'plateNumber' | 'origin' | 'status' | 'remarks';
 
 const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
@@ -46,7 +143,7 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [usersList, setUsersList] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
-  
+
   // Filters & Sorting
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'custom'>('all');
   const [selectedDriverFilter, setSelectedDriverFilter] = useState('all');
@@ -56,11 +153,15 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   // New Data Inputs
   const [newVehiclePlate, setNewVehiclePlate] = useState('');
   const [newVehicleModel, setNewVehicleModel] = useState('');
   const [newVehicleType, setNewVehicleType] = useState('');
-  
+
   // Add User State
   const [newUser, setNewUser] = useState({
     name: '',
@@ -73,7 +174,7 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editingUserPassword, setEditingUserPassword] = useState('');
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
-  
+
   // Trip Editing State
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
   const [editTripStartStr, setEditTripStartStr] = useState('');
@@ -105,10 +206,10 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
 
   const formatDuration = (totalMinutes?: number) => {
     if (!totalMinutes && totalMinutes !== 0) return 'Aktif';
-    
+
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
-    
+
     if (hours > 0) {
       return `${hours} Jam ${minutes > 0 ? `${minutes} Minit` : ''}`;
     }
@@ -133,14 +234,14 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
       } else if (dateFilter === 'week') {
         passDate = trip.startTime >= oneWeekAgo;
       } else if (dateFilter === 'custom' && customStartDate && customEndDate) {
-        const start = new Date(customStartDate).setHours(0,0,0,0);
-        const end = new Date(customEndDate).setHours(23,59,59,999);
+        const start = new Date(customStartDate).setHours(0, 0, 0, 0);
+        const end = new Date(customEndDate).setHours(23, 59, 59, 999);
         passDate = trip.startTime >= start && trip.startTime <= end;
       }
 
       // Search Filter
       const query = searchQuery.toLowerCase();
-      const passSearch = 
+      const passSearch =
         trip.driverName.toLowerCase().includes(query) ||
         trip.plateNumber.toLowerCase().includes(query) ||
         (trip.destination && trip.destination.toLowerCase().includes(query)) ||
@@ -149,6 +250,10 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
 
       return passDate && passSearch;
     });
+
+    // Reset to first page if filters change
+    // This is handled via useEffect below for better control
+
 
     // Sorting
     return filtered.sort((a, b) => {
@@ -162,6 +267,25 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
           break;
         case 'driverName':
           comparison = a.driverName.localeCompare(b.driverName);
+          // If names are same, or if we want latest trip as secondary sort for Pemandu
+          // The request says "Pemandu's Alphabet then Latest Mula Memandu (this is strictly only use latest even the arrangement of the Pemandu is decending)"
+          if (comparison === 0 || sortKey === 'driverName') {
+            const nameComp = a.driverName.localeCompare(b.driverName);
+            if (nameComp !== 0) {
+              comparison = nameComp;
+            } else {
+              // Same driver, sort by latest startTime descending
+              return b.startTime - a.startTime;
+            }
+            // If we are here, we are sorting by driverName. 
+            // The primary comparison is nameComp.
+            // If nameComp is 0, we already returned.
+            // But the requirement says "Pemandu's Alphabet then Latest Mula Memandu" 
+            // and "strictly only use latest even the arrangement of the Pemandu is decending".
+            // This means if we sort by Pemandu (ASC or DESC), the secondary sort is ALWAYS startTime DESC.
+
+            comparison = nameComp;
+          }
           break;
         case 'plateNumber':
           comparison = a.plateNumber.localeCompare(b.plateNumber);
@@ -184,6 +308,17 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
 
   const filteredTrips = getFilteredTrips();
 
+  // Reset pagination when filters or sort change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [dateFilter, selectedDriverFilter, searchQuery, sortKey, sortOrder, customStartDate, customEndDate]);
+
+  const totalPages = Math.ceil(filteredTrips.length / itemsPerPage);
+  const paginatedTrips = filteredTrips.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
   const handleExportPDF = () => {
     if (typeof jspdf === 'undefined') {
       alert("Modul PDF sedang dimuatkan, sila cuba sebentar lagi.");
@@ -191,11 +326,11 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
     }
 
     const doc = new jspdf.jsPDF('l', 'mm', 'a4');
-    
+
     doc.setFontSize(12);
     doc.setTextColor(245, 158, 11);
     doc.text("KeDriver - Laporan Perjalanan", 14, 22);
-    
+
     doc.setFontSize(9);
     doc.setTextColor(100);
     doc.text(`Dijana oleh: ${user.name}`, 14, 30);
@@ -207,23 +342,23 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
     }
 
     const tableData = filteredTrips.map(t => {
-       const vehicle = vehicles.find(v => v.id === t.vehicleId);
-       const displayBrand = t.vehicleBrand || vehicle?.type || '-';
-       const displayModel = t.vehicleModel || vehicle?.model || '-';
-       const formattedEndTime = t.endTime ? format(t.endTime, 'dd/MM/yyyy hh:mm a') : '-';
-       
-       return [
-         format(t.startTime, 'dd/MM/yyyy hh:mm a'),
-         formattedEndTime,
-         t.driverName,
-         t.plateNumber,
-         displayBrand,
-         displayModel,
-         t.origin + (t.destination ? ` > ${t.destination}` : ' > [Aktif]'),
-         t.passengers || '-',
-         t.remarks || '-',
-         formatDuration(t.durationMinutes)
-       ];
+      const vehicle = vehicles.find(v => v.id === t.vehicleId);
+      const displayBrand = t.vehicleBrand || vehicle?.type || '-';
+      const displayModel = t.vehicleModel || vehicle?.model || '-';
+      const formattedEndTime = t.endTime ? format(t.endTime, 'dd/MM/yyyy hh:mm a') : '-';
+
+      return [
+        format(t.startTime, 'dd/MM/yyyy hh:mm a'),
+        formattedEndTime,
+        t.driverName,
+        t.plateNumber,
+        displayBrand,
+        displayModel,
+        t.origin + (t.destination ? ` > ${t.destination}` : ' > [Aktif]'),
+        t.passengers || '-',
+        t.remarks || '-',
+        formatDuration(t.durationMinutes)
+      ];
     });
 
     const startY = selectedDriverFilter !== 'all' ? 48 : 44;
@@ -267,8 +402,8 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
   const formatForInput = (timestamp: number) => {
     if (!timestamp) return '';
     const d = new Date(timestamp);
-    const pad = (n: number) => n < 10 ? '0'+n : n;
-    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    const pad = (n: number) => n < 10 ? '0' + n : n;
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
 
   const openEditTrip = (trip: Trip) => {
@@ -286,45 +421,45 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
     let status = editingTrip.status;
 
     if (editTripEndStr) {
-        endTime = new Date(editTripEndStr).getTime();
-        const durationMs = endTime - startTime;
-        durationMinutes = Math.max(1, Math.round(durationMs / 60000));
-        status = 'COMPLETED';
+      endTime = new Date(editTripEndStr).getTime();
+      const durationMs = endTime - startTime;
+      durationMinutes = Math.max(1, Math.round(durationMs / 60000));
+      status = 'COMPLETED';
     } else {
-        endTime = undefined;
-        durationMinutes = undefined;
-        status = 'ACTIVE';
+      endTime = undefined;
+      durationMinutes = undefined;
+      status = 'ACTIVE';
     }
 
     const updatedTrip: Trip = {
-        ...editingTrip,
-        startTime,
-        endTime,
-        durationMinutes,
-        status
+      ...editingTrip,
+      startTime,
+      endTime,
+      durationMinutes,
+      status
     };
 
     try {
-        await updateTrip(updatedTrip);
-        setEditingTrip(null);
-        await loadData();
-        alert("Perjalanan berjaya dikemaskini.");
+      await updateTrip(updatedTrip);
+      setEditingTrip(null);
+      await loadData();
+      alert("Perjalanan berjaya dikemaskini.");
     } catch (e) {
-        alert("Gagal mengemaskini perjalanan.");
+      alert("Gagal mengemaskini perjalanan.");
     }
   };
 
   const confirmDeleteTrip = async () => {
     if (!tripToDelete) return;
     try {
-        await deleteTrip(tripToDelete);
-        setTrips(currentTrips => currentTrips.filter(t => t.id !== tripToDelete));
-        setTripToDelete(null);
+      await deleteTrip(tripToDelete);
+      setTrips(currentTrips => currentTrips.filter(t => t.id !== tripToDelete));
+      setTripToDelete(null);
     } catch (e: any) {
-        console.error("Delete Trip Error:", e);
-        alert("Gagal memadam: " + e.message);
-        await loadData();
-        setTripToDelete(null);
+      console.error("Delete Trip Error:", e);
+      alert("Gagal memadam: " + e.message);
+      await loadData();
+      setTripToDelete(null);
     }
   };
 
@@ -339,7 +474,7 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
       });
       setNewVehiclePlate('');
       setNewVehicleModel('');
-      setNewVehicleType(''); 
+      setNewVehicleType('');
       await loadData();
       alert("Kenderaan berjaya ditambah");
     } catch (e) {
@@ -370,11 +505,11 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
 
   const handleDeleteUser = async (id: string) => {
     if (id === user.id) {
-        alert("Anda tidak boleh memadam akaun anda sendiri.");
-        return;
+      alert("Anda tidak boleh memadam akaun anda sendiri.");
+      return;
     }
 
-    if(window.confirm("Adakah anda pasti mahu memadam pengguna ini?")) {
+    if (window.confirm("Adakah anda pasti mahu memadam pengguna ini?")) {
       try {
         await deleteUser(id);
         await loadData();
@@ -385,7 +520,7 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
   };
 
   const handleDeleteVehicle = async (id: string) => {
-    if(window.confirm("Adakah anda pasti mahu memadam kenderaan ini?")) {
+    if (window.confirm("Adakah anda pasti mahu memadam kenderaan ini?")) {
       try {
         await deleteVehicle(id);
         await loadData();
@@ -397,7 +532,7 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
 
   const handleUpdateUser = async () => {
     if (!editingUser) return;
-    
+
     const updatedUser = { ...editingUser };
     if (editingUserPassword.trim()) {
       updatedUser.password = editingUserPassword;
@@ -430,21 +565,21 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
       {/* Sidebar - Desktop */}
       <aside className="w-64 bg-white border-r border-amber-100 hidden md:flex flex-col h-full z-10 shrink-0">
         <div className="p-6">
-           <h1 className="text-2xl font-bold text-primary-600 flex items-center gap-2">
-             <Truck className="w-8 h-8" />
-             KeDriver
-           </h1>
-           <p className="text-xs text-gray-500 mt-1 pl-10">Panel Ketua Pemandu</p>
+          <h1 className="text-2xl font-bold text-primary-600 flex items-center gap-2">
+            <Truck className="w-8 h-8" />
+            KeDriver
+          </h1>
+          <p className="text-xs text-gray-500 mt-1 pl-10">Panel Ketua Pemandu</p>
         </div>
-        
+
         <nav className="flex-1 px-4 space-y-2 overflow-y-auto">
-          <button 
+          <button
             onClick={() => setActiveTab('dashboard')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors font-medium ${activeTab === 'dashboard' ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50'}`}
           >
             <LayoutDashboard className="w-5 h-5" /> Laporan & Log
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('settings')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors font-medium ${activeTab === 'settings' ? 'bg-primary-50 text-primary-700' : 'text-gray-600 hover:bg-gray-50'}`}
           >
@@ -453,18 +588,18 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
         </nav>
 
         <div className="p-4 border-t border-amber-100 shrink-0">
-           <div className="flex items-center gap-3 mb-4 px-2">
-             <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 font-bold">
-               {user.name.charAt(0)}
-             </div>
-             <div className="text-sm overflow-hidden">
-               <p className="font-medium text-gray-900 truncate">{user.name}</p>
-               <p className="text-gray-500 text-xs">Ketua Pemandu</p>
-             </div>
-           </div>
-           <button onClick={onLogout} className="w-full py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
-             Log Keluar
-           </button>
+          <div className="flex items-center gap-3 mb-4 px-2">
+            <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 font-bold">
+              {user.name.charAt(0)}
+            </div>
+            <div className="text-sm overflow-hidden">
+              <p className="font-medium text-gray-900 truncate">{user.name}</p>
+              <p className="text-gray-500 text-xs">Ketua Pemandu</p>
+            </div>
+          </div>
+          <button onClick={onLogout} className="w-full py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+            Log Keluar
+          </button>
         </div>
       </aside>
 
@@ -478,10 +613,10 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
 
         {/* Main Content Area */}
         <main className="flex-1 overflow-y-auto p-4 md:p-6 scroll-smooth">
-          
+
           {activeTab === 'dashboard' && (
             <div className="space-y-6 max-w-7xl mx-auto">
-              
+
               {/* DELETE TRIP CONFIRMATION MODAL */}
               {tripToDelete && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
@@ -494,13 +629,13 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                       <p className="text-gray-500 mt-2 text-sm">Adakah anda pasti mahu memadam rekod perjalanan ini? Tindakan ini tidak boleh diundur.</p>
                     </div>
                     <div className="grid grid-cols-2 gap-3 pt-2">
-                      <button 
+                      <button
                         onClick={() => setTripToDelete(null)}
                         className="py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors"
                       >
                         Batal
                       </button>
-                      <button 
+                      <button
                         onClick={confirmDeleteTrip}
                         className="py-3 px-4 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl shadow-lg shadow-red-500/30 transition-colors"
                       >
@@ -515,123 +650,123 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
               {editingTrip && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
                   <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl overflow-y-auto max-h-[90vh]">
-                      <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">
-                          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                              <Edit2 className="w-5 h-5 text-primary-500" /> Kemaskini Perjalanan
-                          </h3>
-                          <button onClick={() => setEditingTrip(null)} className="text-gray-400 hover:text-gray-600"><X className="w-6 h-6"/></button>
-                      </div>
-                      
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                              <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><Clock className="w-3 h-3"/> Mula</label>
-                              <input 
-                                  type="datetime-local"
-                                  value={editTripStartStr}
-                                  onChange={e => setEditTripStartStr(e.target.value)}
-                                  className="w-full border p-2 rounded-lg bg-gray-50 text-gray-900 text-sm"
-                              />
-                          </div>
-                          <div>
-                              <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><Clock className="w-3 h-3"/> Tamat</label>
-                              <input 
-                                  type="datetime-local"
-                                  value={editTripEndStr}
-                                  onChange={e => setEditTripEndStr(e.target.value)}
-                                  className="w-full border p-2 rounded-lg bg-gray-50 text-gray-900 text-sm"
-                              />
-                          </div>
-                        </div>
+                    <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">
+                      <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                        <Edit2 className="w-5 h-5 text-primary-500" /> Kemaskini Perjalanan
+                      </h3>
+                      <button onClick={() => setEditingTrip(null)} className="text-gray-400 hover:text-gray-600"><X className="w-6 h-6" /></button>
+                    </div>
 
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                              <label className="text-xs font-bold text-gray-500 mb-1 block">Kenderaan</label>
-                              <select 
-                                  value={editingTrip.vehicleId}
-                                  onChange={e => {
-                                      const v = vehicles.find(veh => veh.id === e.target.value);
-                                      if(v) setEditingTrip({
-                                          ...editingTrip, 
-                                          vehicleId: v.id, 
-                                          plateNumber: v.plateNumber, 
-                                          vehicleModel: v.model,
-                                          vehicleBrand: v.type 
-                                      });
-                                  }}
-                                  className="w-full border p-2 rounded-lg bg-gray-50 text-gray-900 text-sm"
-                              >
-                                  {vehicles.map(v => (
-                                      <option key={v.id} value={v.id}>{v.plateNumber}</option>
-                                  ))}
-                              </select>
-                          </div>
-                          <div>
-                              <label className="text-xs font-bold text-gray-500 mb-1 block">Pemandu</label>
-                              <select 
-                                  value={editingTrip.driverId}
-                                  onChange={e => {
-                                      const u = usersList.find(usr => usr.id === e.target.value);
-                                      if(u) setEditingTrip({...editingTrip, driverId: u.id, driverName: u.name});
-                                  }}
-                                  className="w-full border p-2 rounded-lg bg-gray-50 text-gray-900 text-sm"
-                              >
-                                  {usersList.filter(u => u.role === UserRole.DRIVER || u.role === UserRole.HEAD_DRIVER).map(u => (
-                                      <option key={u.id} value={u.id}>{u.name}</option>
-                                  ))}
-                              </select>
-                          </div>
-                        </div>
-
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><MapPin className="w-3 h-3"/> Lokasi Asal</label>
-                          <input 
-                            type="text" 
-                            value={editingTrip.origin} 
-                            onChange={e => setEditingTrip({...editingTrip, origin: e.target.value})}
+                          <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><Clock className="w-3 h-3" /> Mula</label>
+                          <input
+                            type="datetime-local"
+                            value={editTripStartStr}
+                            onChange={e => setEditTripStartStr(e.target.value)}
                             className="w-full border p-2 rounded-lg bg-gray-50 text-gray-900 text-sm"
                           />
                         </div>
-                        
                         <div>
-                          <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><MapPin className="w-3 h-3 text-red-500"/> Destinasi</label>
-                          <input 
-                            type="text" 
-                            value={editingTrip.destination} 
-                            onChange={e => setEditingTrip({...editingTrip, destination: e.target.value})}
-                            placeholder="Kosongkan jika masih aktif"
+                          <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><Clock className="w-3 h-3" /> Tamat</label>
+                          <input
+                            type="datetime-local"
+                            value={editTripEndStr}
+                            onChange={e => setEditTripEndStr(e.target.value)}
                             className="w-full border p-2 rounded-lg bg-gray-50 text-gray-900 text-sm"
                           />
-                        </div>
-
-                        <div>
-                          <label className="text-xs font-bold text-gray-500 mb-1 block">Penumpang</label>
-                          <textarea 
-                            value={editingTrip.passengers} 
-                            onChange={e => setEditingTrip({...editingTrip, passengers: e.target.value})}
-                            className="w-full border p-2 rounded-lg bg-gray-50 text-gray-900 text-sm"
-                            rows={2}
-                          />
-                        </div>
-                        
-                        <div>
-                          <label className="text-xs font-bold text-gray-500 mb-1 block">Catatan</label>
-                          <textarea 
-                            value={editingTrip.remarks || ''} 
-                            onChange={e => setEditingTrip({...editingTrip, remarks: e.target.value})}
-                            className="w-full border p-2 rounded-lg bg-gray-50 text-gray-900 text-sm"
-                            rows={2}
-                            placeholder="Contoh: Isian minyak..."
-                          />
-                        </div>
-
-                        <div className="flex gap-2 pt-4">
-                          <button onClick={() => setEditingTrip(null)} className="flex-1 py-3 bg-gray-100 rounded-xl text-gray-600 font-bold hover:bg-gray-200 transition-colors">Batal</button>
-                          <button onClick={handleUpdateTrip} className="flex-1 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-bold transition-colors flex items-center justify-center gap-2">
-                              <Save className="w-4 h-4"/> Simpan
-                          </button>
                         </div>
                       </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs font-bold text-gray-500 mb-1 block">Kenderaan</label>
+                          <select
+                            value={editingTrip.vehicleId}
+                            onChange={e => {
+                              const v = vehicles.find(veh => veh.id === e.target.value);
+                              if (v) setEditingTrip({
+                                ...editingTrip,
+                                vehicleId: v.id,
+                                plateNumber: v.plateNumber,
+                                vehicleModel: v.model,
+                                vehicleBrand: v.type
+                              });
+                            }}
+                            className="w-full border p-2 rounded-lg bg-gray-50 text-gray-900 text-sm"
+                          >
+                            {vehicles.map(v => (
+                              <option key={v.id} value={v.id}>{v.plateNumber}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-gray-500 mb-1 block">Pemandu</label>
+                          <select
+                            value={editingTrip.driverId}
+                            onChange={e => {
+                              const u = usersList.find(usr => usr.id === e.target.value);
+                              if (u) setEditingTrip({ ...editingTrip, driverId: u.id, driverName: u.name });
+                            }}
+                            className="w-full border p-2 rounded-lg bg-gray-50 text-gray-900 text-sm"
+                          >
+                            {usersList.filter(u => u.role === UserRole.DRIVER || u.role === UserRole.HEAD_DRIVER).map(u => (
+                              <option key={u.id} value={u.id}>{u.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><MapPin className="w-3 h-3" /> Lokasi Asal</label>
+                        <input
+                          type="text"
+                          value={editingTrip.origin}
+                          onChange={e => setEditingTrip({ ...editingTrip, origin: e.target.value })}
+                          className="w-full border p-2 rounded-lg bg-gray-50 text-gray-900 text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><MapPin className="w-3 h-3 text-red-500" /> Destinasi</label>
+                        <input
+                          type="text"
+                          value={editingTrip.destination}
+                          onChange={e => setEditingTrip({ ...editingTrip, destination: e.target.value })}
+                          placeholder="Kosongkan jika masih aktif"
+                          className="w-full border p-2 rounded-lg bg-gray-50 text-gray-900 text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 mb-1 block">Penumpang</label>
+                        <textarea
+                          value={editingTrip.passengers}
+                          onChange={e => setEditingTrip({ ...editingTrip, passengers: e.target.value })}
+                          className="w-full border p-2 rounded-lg bg-gray-50 text-gray-900 text-sm"
+                          rows={2}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-gray-500 mb-1 block">Catatan</label>
+                        <textarea
+                          value={editingTrip.remarks || ''}
+                          onChange={e => setEditingTrip({ ...editingTrip, remarks: e.target.value })}
+                          className="w-full border p-2 rounded-lg bg-gray-50 text-gray-900 text-sm"
+                          rows={2}
+                          placeholder="Contoh: Isian minyak..."
+                        />
+                      </div>
+
+                      <div className="flex gap-2 pt-4">
+                        <button onClick={() => setEditingTrip(null)} className="flex-1 py-3 bg-gray-100 rounded-xl text-gray-600 font-bold hover:bg-gray-200 transition-colors">Batal</button>
+                        <button onClick={handleUpdateTrip} className="flex-1 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-bold transition-colors flex items-center justify-center gap-2">
+                          <Save className="w-4 h-4" /> Simpan
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -643,7 +778,7 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                     <RefreshCw className={`w-4 h-4 text-gray-600 ${loading ? 'animate-spin' : ''}`} />
                   </button>
                 </div>
-                
+
                 <div className="flex gap-2">
                   <button onClick={handleExportPDF} className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-md transition-colors">
                     <Download className="w-4 h-4" /> Eksport PDF
@@ -654,13 +789,13 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
               {/* Filters */}
               <div className="bg-white p-4 rounded-xl shadow-sm border border-amber-100 flex flex-col gap-4">
                 <div className="flex flex-col xl:flex-row gap-4">
-                  
+
                   {/* Search */}
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-2.5 text-gray-400 w-5 h-5" />
-                    <input 
-                      type="text" 
-                      placeholder="Cari plat, catatan atau lokasi..." 
+                    <input
+                      type="text"
+                      placeholder="Cari plat, catatan atau lokasi..."
                       className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
@@ -670,7 +805,7 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                   {/* Driver Filter */}
                   <div className="relative min-w-[220px]">
                     <Filter className="absolute left-3 top-2.5 text-gray-400 w-4 h-4" />
-                    <select 
+                    <select
                       value={selectedDriverFilter}
                       onChange={(e) => setSelectedDriverFilter(e.target.value)}
                       className="w-full pl-9 pr-8 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900 appearance-none"
@@ -678,34 +813,35 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                       <option value="all">Semua Pemandu</option>
                       {usersList
                         .filter(u => u.role === UserRole.DRIVER || u.role === UserRole.HEAD_DRIVER)
+                        .sort((a, b) => a.name.localeCompare(b.name))
                         .map(u => (
                           <option key={u.id} value={u.id}>{u.name}</option>
-                      ))}
+                        ))}
                     </select>
                     <ArrowDown className="absolute right-3 top-3 text-gray-400 w-3 h-3 pointer-events-none" />
                   </div>
 
                   {/* Date Filter Buttons */}
                   <div className="flex bg-gray-100 p-1 rounded-lg overflow-x-auto">
-                    <button 
+                    <button
                       onClick={() => setDateFilter('all')}
                       className={`whitespace-nowrap px-4 py-1.5 rounded-md text-sm font-medium transition-all ${dateFilter === 'all' ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}
                     >
                       Semua
                     </button>
-                    <button 
+                    <button
                       onClick={() => setDateFilter('week')}
                       className={`whitespace-nowrap px-4 py-1.5 rounded-md text-sm font-medium transition-all ${dateFilter === 'week' ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}
                     >
                       Minggu Ini
                     </button>
-                    <button 
+                    <button
                       onClick={() => setDateFilter('today')}
                       className={`whitespace-nowrap px-4 py-1.5 rounded-md text-sm font-medium transition-all ${dateFilter === 'today' ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}
                     >
                       Hari Ini
                     </button>
-                    <button 
+                    <button
                       onClick={() => setDateFilter('custom')}
                       className={`whitespace-nowrap px-4 py-1.5 rounded-md text-sm font-medium transition-all ${dateFilter === 'custom' ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}
                     >
@@ -717,36 +853,74 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                 {/* Custom Date Range Picker */}
                 {dateFilter === 'custom' && (
                   <div className="flex flex-col sm:flex-row items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
-                      <Calendar className="w-4 h-4 text-gray-500" />
-                      <span className="text-sm text-gray-600 font-medium">Dari:</span>
-                      <input 
-                        type="date" 
-                        value={customStartDate} 
-                        onChange={(e) => setCustomStartDate(e.target.value)}
-                        className="border rounded px-2 py-1 text-sm bg-white text-gray-900"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
-                      <span className="text-sm text-gray-600 font-medium">Hingga:</span>
-                      <input 
-                        type="date" 
-                        value={customEndDate} 
-                        onChange={(e) => setCustomEndDate(e.target.value)}
-                        className="border rounded px-2 py-1 text-sm bg-white text-gray-900"
-                      />
-                    </div>
+                    <StrictDateInput
+                      label="Dari:"
+                      value={customStartDate}
+                      onChange={setCustomStartDate}
+                    />
+                    <StrictDateInput
+                      label="Hingga:"
+                      value={customEndDate}
+                      onChange={setCustomEndDate}
+                    />
                   </div>
                 )}
               </div>
 
               {/* Table */}
               <div className="bg-white rounded-xl shadow-sm border border-amber-100 overflow-hidden">
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="bg-amber-50/30 border-b border-amber-100 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="text-sm text-gray-500">
+                      Menunjukkan <span className="font-bold text-gray-700">{Math.min(filteredTrips.length, (currentPage - 1) * itemsPerPage + 1)}</span> hingga <span className="font-bold text-gray-700">{Math.min(filteredTrips.length, currentPage * itemsPerPage)}</span> daripada <span className="font-bold text-gray-700">{filteredTrips.length}</span> rekod
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                        className="p-2 rounded-lg bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <ArrowDown className="w-4 h-4 rotate-90" />
+                      </button>
+
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          min="1"
+                          max={totalPages}
+                          value={currentPage}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value);
+                            if (!isNaN(val) && val >= 1 && val <= totalPages) {
+                              setCurrentPage(val);
+                            }
+                          }}
+                          className="w-12 h-9 text-center border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white text-gray-900 font-medium no-spinner"
+                        />
+                        <span className="text-gray-400 mx-1">/</span>
+                        <span className="text-gray-600 font-medium">{totalPages}</span>
+                      </div>
+
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
+                        className="p-2 rounded-lg bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <ArrowDown className="w-4 h-4 -rotate-90" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="overflow-x-auto">
+
                   <table className="w-full text-left">
                     <thead className="bg-amber-50/50 border-b border-amber-100">
                       <tr>
-                        <th 
+                        <th
                           className="px-6 py-4 text-xs font-bold text-gray-500 uppercase cursor-pointer hover:bg-amber-100/50 transition-colors group select-none whitespace-nowrap"
                           onClick={() => handleSort('startTime')}
                         >
@@ -755,7 +929,7 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                             {renderSortIcon('startTime')}
                           </div>
                         </th>
-                        <th 
+                        <th
                           className="px-6 py-4 text-xs font-bold text-gray-500 uppercase cursor-pointer hover:bg-amber-100/50 transition-colors group select-none whitespace-nowrap"
                           onClick={() => handleSort('endTime')}
                         >
@@ -764,7 +938,7 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                             {renderSortIcon('endTime')}
                           </div>
                         </th>
-                        <th 
+                        <th
                           className="px-6 py-4 text-xs font-bold text-gray-500 uppercase cursor-pointer hover:bg-amber-100/50 transition-colors group select-none whitespace-nowrap"
                           onClick={() => handleSort('driverName')}
                         >
@@ -773,7 +947,7 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                             {renderSortIcon('driverName')}
                           </div>
                         </th>
-                        <th 
+                        <th
                           className="px-6 py-4 text-xs font-bold text-gray-500 uppercase cursor-pointer hover:bg-amber-100/50 transition-colors group select-none whitespace-nowrap"
                           onClick={() => handleSort('plateNumber')}
                         >
@@ -782,7 +956,7 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                             {renderSortIcon('plateNumber')}
                           </div>
                         </th>
-                        <th 
+                        <th
                           className="px-6 py-4 text-xs font-bold text-gray-500 uppercase cursor-pointer hover:bg-amber-100/50 transition-colors group select-none whitespace-nowrap"
                           onClick={() => handleSort('origin')}
                         >
@@ -791,7 +965,7 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                             {renderSortIcon('origin')}
                           </div>
                         </th>
-                        <th 
+                        <th
                           className="px-6 py-4 text-xs font-bold text-gray-500 uppercase cursor-pointer hover:bg-amber-100/50 transition-colors group select-none whitespace-nowrap"
                           onClick={() => handleSort('remarks')}
                         >
@@ -800,7 +974,7 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                             {renderSortIcon('remarks')}
                           </div>
                         </th>
-                        <th 
+                        <th
                           className="px-6 py-4 text-xs font-bold text-gray-500 uppercase cursor-pointer hover:bg-amber-100/50 transition-colors group select-none whitespace-nowrap"
                           onClick={() => handleSort('status')}
                         >
@@ -813,58 +987,58 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {filteredTrips.map(trip => {
+                      {paginatedTrips.map(trip => {
                         const vehicle = vehicles.find(v => v.id === trip.vehicleId);
                         const displayBrand = trip.vehicleBrand || vehicle?.type || '-';
                         const displayModel = trip.vehicleModel || vehicle?.model || '-';
 
                         return (
-                        <tr key={trip.id} className="hover:bg-gray-50/50">
-                          <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
-                            <div className="font-medium text-gray-900">{format(trip.startTime, 'dd/MM/yyyy')}</div>
-                            <div className="text-gray-400 text-xs">{format(trip.startTime, 'hh:mm a')}</div>
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
-                            {trip.endTime ? (
-                              <>
-                                <div className="font-medium text-gray-900">{format(trip.endTime, 'dd/MM/yyyy')}</div>
-                                <div className="text-gray-400 text-xs">{format(trip.endTime, 'hh:mm a')}</div>
-                              </>
-                            ) : <span className="text-gray-400">-</span>}
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center text-xs font-bold text-primary-700 shrink-0">
-                                {trip.driverName.charAt(0)}
+                          <tr key={trip.id} className="hover:bg-gray-50/50">
+                            <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
+                              <div className="font-medium text-gray-900">{format(trip.startTime, 'dd/MM/yyyy')}</div>
+                              <div className="text-gray-400 text-xs">{format(trip.startTime, 'hh:mm a')}</div>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
+                              {trip.endTime ? (
+                                <>
+                                  <div className="font-medium text-gray-900">{format(trip.endTime, 'dd/MM/yyyy')}</div>
+                                  <div className="text-gray-400 text-xs">{format(trip.endTime, 'hh:mm a')}</div>
+                                </>
+                              ) : <span className="text-gray-400">-</span>}
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center text-xs font-bold text-primary-700 shrink-0">
+                                  {trip.driverName.charAt(0)}
+                                </div>
+                                <span className="text-sm font-medium text-gray-700 whitespace-nowrap">{trip.driverName}</span>
                               </div>
-                              <span className="text-sm font-medium text-gray-700 whitespace-nowrap">{trip.driverName}</span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <p className="text-sm font-bold text-gray-800 whitespace-nowrap">{trip.plateNumber}</p>
-                            <div className="flex flex-col">
+                            </td>
+                            <td className="px-6 py-4">
+                              <p className="text-sm font-bold text-gray-800 whitespace-nowrap">{trip.plateNumber}</p>
+                              <div className="flex flex-col">
                                 <span className="text-xs text-gray-500 font-medium">{displayBrand}</span>
                                 <span className="text-xs text-gray-400">{displayModel}</span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 min-w-[200px]">
-                            <div className="flex flex-col gap-1">
-                              <span className="text-xs text-gray-600 flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0"></div> {trip.origin}</span>
-                              <span className="text-xs text-gray-600 flex items-center gap-1">
-                                <div className={`w-1.5 h-1.5 rounded-full ${trip.destination ? 'bg-red-500' : 'bg-gray-300'} shrink-0`}></div> 
-                                {trip.destination || <span className="text-primary-500 italic">Dalam perjalanan...</span>}
-                              </span>
-                            </div>
-                            {trip.passengers && <p className="text-xs text-gray-500 mt-1 italic pl-2.5">Pax: {trip.passengers}</p>}
-                          </td>
-                          <td className="px-6 py-4 min-w-[150px]">
-                            {trip.remarks ? (
-                              <p className="text-xs text-gray-600 bg-amber-50 p-2 rounded border border-amber-100">{trip.remarks}</p>
-                            ) : (
-                              <span className="text-gray-300 text-xs italic">-</span>
-                            )}
-                          </td>
-                          <td className="px-6 py-4">
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 min-w-[200px]">
+                              <div className="flex flex-col gap-1">
+                                <span className="text-xs text-gray-600 flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0"></div> {trip.origin}</span>
+                                <span className="text-xs text-gray-600 flex items-center gap-1">
+                                  <div className={`w-1.5 h-1.5 rounded-full ${trip.destination ? 'bg-red-500' : 'bg-gray-300'} shrink-0`}></div>
+                                  {trip.destination || <span className="text-primary-500 italic">Dalam perjalanan...</span>}
+                                </span>
+                              </div>
+                              {trip.passengers && <p className="text-xs text-gray-500 mt-1 italic pl-2.5">Pax: {trip.passengers}</p>}
+                            </td>
+                            <td className="px-6 py-4 min-w-[150px]">
+                              {trip.remarks ? (
+                                <p className="text-xs text-gray-600 bg-amber-50 p-2 rounded border border-amber-100">{trip.remarks}</p>
+                              ) : (
+                                <span className="text-gray-300 text-xs italic">-</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4">
                               {trip.status === 'ACTIVE' ? (
                                 <span className="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-full animate-pulse whitespace-nowrap">
                                   AKTIF
@@ -874,31 +1048,32 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                                   {formatDuration(trip.durationMinutes)}
                                 </span>
                               )}
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center justify-center gap-2">
-                              <button 
-                                onClick={() => openEditTrip(trip)} 
-                                className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
-                                title="Sunting Perjalanan"
-                              >
-                                  <Edit2 className="w-4 h-4"/>
-                              </button>
-                              <button 
-                                type="button"
-                                onClick={(e) => {
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center justify-center gap-2">
+                                <button
+                                  onClick={() => openEditTrip(trip)}
+                                  className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                                  title="Sunting Perjalanan"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
                                     e.stopPropagation();
                                     setTripToDelete(trip.id);
-                                }}
-                                className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors cursor-pointer"
-                                title="Padam Perjalanan"
-                              >
-                                  <Trash2 className="w-4 h-4"/>
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      )})}
+                                  }}
+                                  className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors cursor-pointer"
+                                  title="Padam Perjalanan"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
                       {filteredTrips.length === 0 && (
                         <tr>
                           <td colSpan={8} className="px-6 py-12 text-center text-gray-400">
@@ -909,55 +1084,56 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                     </tbody>
                   </table>
                 </div>
+
               </div>
             </div>
           )}
 
           {activeTab === 'settings' && (
             <div className="grid md:grid-cols-2 gap-6 max-w-6xl mx-auto">
-              
+
               {editingUser && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
                   <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
-                      <h3 className="text-lg font-bold mb-4 text-gray-900">Kemaskini Pengguna</h3>
-                      <div className="space-y-3">
-                        <div>
-                          <label className="text-xs font-bold text-gray-500">Nama Penuh</label>
-                          <input 
-                            type="text" 
-                            value={editingUser.name} 
-                            onChange={e => setEditingUser({...editingUser,name: e.target.value})}
-                            className="w-full border p-2 rounded-lg bg-white text-gray-900"
-                          />
-                        </div>
-                        
-                        <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
-                          <label className="text-xs font-bold text-gray-500 mb-1 block">Tukar Kata Laluan (Biarkan kosong jika tiada perubahan)</label>
-                          <input 
-                            type="password" 
-                            value={editingUserPassword} 
-                            onChange={e => setEditingUserPassword(e.target.value)}
-                            placeholder="Kata Laluan Baru"
-                            className="w-full border p-2 rounded-lg bg-white text-gray-900"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-xs font-bold text-gray-500">Peranan</label>
-                          <select 
-                            value={editingUser.role} 
-                            onChange={e => setEditingUser({...editingUser, role: e.target.value as UserRole})}
-                            className="w-full border p-2 rounded-lg bg-white text-gray-900"
-                          >
-                            <option value={UserRole.DRIVER}>Pemandu</option>
-                            <option value={UserRole.HEAD_DRIVER}>Ketua Pemandu</option>
-                          </select>
-                        </div>
-                        <div className="flex gap-2 pt-2">
-                          <button onClick={() => {setEditingUser(null); setEditingUserPassword('')}} className="flex-1 py-2 bg-gray-100 rounded-lg text-gray-600 font-bold">Batal</button>
-                          <button onClick={handleUpdateUser} className="flex-1 py-2 bg-primary-500 text-white rounded-lg font-bold">Simpan</button>
-                        </div>
+                    <h3 className="text-lg font-bold mb-4 text-gray-900">Kemaskini Pengguna</h3>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs font-bold text-gray-500">Nama Penuh</label>
+                        <input
+                          type="text"
+                          value={editingUser.name}
+                          onChange={e => setEditingUser({ ...editingUser, name: e.target.value })}
+                          className="w-full border p-2 rounded-lg bg-white text-gray-900"
+                        />
                       </div>
+
+                      <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                        <label className="text-xs font-bold text-gray-500 mb-1 block">Tukar Kata Laluan (Biarkan kosong jika tiada perubahan)</label>
+                        <input
+                          type="password"
+                          value={editingUserPassword}
+                          onChange={e => setEditingUserPassword(e.target.value)}
+                          placeholder="Kata Laluan Baru"
+                          className="w-full border p-2 rounded-lg bg-white text-gray-900"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-gray-500">Peranan</label>
+                        <select
+                          value={editingUser.role}
+                          onChange={e => setEditingUser({ ...editingUser, role: e.target.value as UserRole })}
+                          className="w-full border p-2 rounded-lg bg-white text-gray-900"
+                        >
+                          <option value={UserRole.DRIVER}>Pemandu</option>
+                          <option value={UserRole.HEAD_DRIVER}>Ketua Pemandu</option>
+                        </select>
+                      </div>
+                      <div className="flex gap-2 pt-2">
+                        <button onClick={() => { setEditingUser(null); setEditingUserPassword('') }} className="flex-1 py-2 bg-gray-100 rounded-lg text-gray-600 font-bold">Batal</button>
+                        <button onClick={handleUpdateUser} className="flex-1 py-2 bg-primary-500 text-white rounded-lg font-bold">Simpan</button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -965,194 +1141,194 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
               {editingVehicle && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
                   <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
-                      <h3 className="text-lg font-bold mb-4 text-gray-900">Kemaskini Kenderaan</h3>
-                      <div className="space-y-3">
-                        <div>
-                          <label className="text-xs font-bold text-gray-500">Nombor Plat</label>
-                          <input 
-                            type="text" 
-                            value={editingVehicle.plateNumber} 
-                            onChange={e => setEditingVehicle({...editingVehicle, plateNumber: e.target.value})}
-                            className="w-full border p-2 rounded-lg uppercase bg-white text-gray-900"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-bold text-gray-500">Jenis</label>
-                          <input 
-                            type="text" 
-                            value={editingVehicle.model} 
-                            onChange={e => setEditingVehicle({...editingVehicle, model: e.target.value})}
-                            className="w-full border p-2 rounded-lg bg-white text-gray-900"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-bold text-gray-500">Jenama (Contoh: Toyota, Hino)</label>
-                          <input 
-                              type="text"
-                              value={editingVehicle.type} 
-                              onChange={e => setEditingVehicle({...editingVehicle, type: e.target.value})}
-                              className="w-full border p-2 rounded-lg bg-white text-gray-900"
-                              placeholder="Jenama Kenderaan"
-                            />
-                        </div>
-                        <div className="flex gap-2 pt-2">
-                          <button onClick={() => setEditingVehicle(null)} className="flex-1 py-2 bg-gray-100 rounded-lg text-gray-600 font-bold">Batal</button>
-                          <button onClick={handleUpdateVehicle} className="flex-1 py-2 bg-primary-500 text-white rounded-lg font-bold">Simpan</button>
-                        </div>
+                    <h3 className="text-lg font-bold mb-4 text-gray-900">Kemaskini Kenderaan</h3>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs font-bold text-gray-500">Nombor Plat</label>
+                        <input
+                          type="text"
+                          value={editingVehicle.plateNumber}
+                          onChange={e => setEditingVehicle({ ...editingVehicle, plateNumber: e.target.value })}
+                          className="w-full border p-2 rounded-lg uppercase bg-white text-gray-900"
+                        />
                       </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500">Jenis</label>
+                        <input
+                          type="text"
+                          value={editingVehicle.model}
+                          onChange={e => setEditingVehicle({ ...editingVehicle, model: e.target.value })}
+                          className="w-full border p-2 rounded-lg bg-white text-gray-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-500">Jenama (Contoh: Toyota, Hino)</label>
+                        <input
+                          type="text"
+                          value={editingVehicle.type}
+                          onChange={e => setEditingVehicle({ ...editingVehicle, type: e.target.value })}
+                          className="w-full border p-2 rounded-lg bg-white text-gray-900"
+                          placeholder="Jenama Kenderaan"
+                        />
+                      </div>
+                      <div className="flex gap-2 pt-2">
+                        <button onClick={() => setEditingVehicle(null)} className="flex-1 py-2 bg-gray-100 rounded-lg text-gray-600 font-bold">Batal</button>
+                        <button onClick={handleUpdateVehicle} className="flex-1 py-2 bg-primary-500 text-white rounded-lg font-bold">Simpan</button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
 
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-amber-100 flex flex-col h-[650px]">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
-                      <UserPlus className="w-6 h-6" />
-                    </div>
-                    <h3 className="text-lg font-bold text-gray-800">Pengurusan Pemandu</h3>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
+                    <UserPlus className="w-6 h-6" />
                   </div>
-                  
-                  <div className="space-y-3 pb-6 border-b border-gray-100">
-                    <input 
-                      type="text" 
-                      className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-gray-900 text-sm" 
-                      placeholder="Nama Penuh"
-                      value={newUser.name}
-                      onChange={(e) => setNewUser({...newUser, name: e.target.value})}
+                  <h3 className="text-lg font-bold text-gray-800">Pengurusan Pemandu</h3>
+                </div>
+
+                <div className="space-y-3 pb-6 border-b border-gray-100">
+                  <input
+                    type="text"
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-gray-900 text-sm"
+                    placeholder="Nama Penuh"
+                    value={newUser.name}
+                    onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                  />
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-gray-900 text-sm"
+                      placeholder="ID Pengguna"
+                      value={newUser.username}
+                      onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
                     />
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <input 
-                        type="text" 
-                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-gray-900 text-sm" 
-                        placeholder="ID Pengguna"
-                        value={newUser.username}
-                        onChange={(e) => setNewUser({...newUser, username: e.target.value})}
-                      />
-                      <input 
-                        type="password" 
-                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-gray-900 text-sm" 
-                        placeholder="Kata Laluan"
-                        value={newUser.password}
-                        onChange={(e) => setNewUser({...newUser, password: e.target.value})}
-                      />
-                    </div>
-
-                    <button 
-                      onClick={handleAddDriver}
-                      disabled={loading}
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium transition-colors flex justify-center items-center gap-2"
-                    >
-                      {loading ? '...' : <><Plus className="w-4 h-4" /> Tambah Pengguna</>}
-                    </button>
+                    <input
+                      type="password"
+                      className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-gray-900 text-sm"
+                      placeholder="Kata Laluan"
+                      value={newUser.password}
+                      onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                    />
                   </div>
 
-                  <div className="mt-4 flex-1 overflow-y-auto pr-2 custom-scrollbar">
-                    <h4 className="text-xs font-bold text-gray-400 uppercase mb-3">Senarai Pengguna ({usersList.length})</h4>
-                    <div className="space-y-2">
-                      {usersList.map(u => (
-                        <div key={u.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors gap-3">
-                          <div className="flex items-center gap-3 overflow-hidden">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 ${u.role === UserRole.HEAD_DRIVER ? 'bg-gray-800' : 'bg-blue-500'}`}>
-                              {u.name.charAt(0)}
-                            </div>
-                            <div className="min-w-0">
-                              <div className="text-sm font-bold text-gray-800 truncate">{u.name}</div>
-                              <div className="text-xs text-gray-500 flex items-center gap-2">
-                                <span>@{u.username}</span> • {u.role === UserRole.HEAD_DRIVER ? 'Admin' : 'Pemandu'}
-                              </div>
-                            </div>
+                  <button
+                    onClick={handleAddDriver}
+                    disabled={loading}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium transition-colors flex justify-center items-center gap-2"
+                  >
+                    {loading ? '...' : <><Plus className="w-4 h-4" /> Tambah Pengguna</>}
+                  </button>
+                </div>
+
+                <div className="mt-4 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                  <h4 className="text-xs font-bold text-gray-400 uppercase mb-3">Senarai Pengguna ({usersList.length})</h4>
+                  <div className="space-y-2">
+                    {usersList.map(u => (
+                      <div key={u.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors gap-3">
+                        <div className="flex items-center gap-3 overflow-hidden">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 ${u.role === UserRole.HEAD_DRIVER ? 'bg-gray-800' : 'bg-blue-500'}`}>
+                            {u.name.charAt(0)}
                           </div>
-                          <div className="flex gap-2 justify-end">
-                            <button onClick={() => setEditingUser(u)} className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"><Edit2 className="w-4 h-4" /></button>
-                            <button 
-                              type="button" 
-                              onClick={(e) => {
-                                  e.preventDefault();
-                                  handleDeleteUser(u.id);
-                              }} 
-                              className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
-                              title="Padam Pengguna"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                          <div className="min-w-0">
+                            <div className="text-sm font-bold text-gray-800 truncate">{u.name}</div>
+                            <div className="text-xs text-gray-500 flex items-center gap-2">
+                              <span>@{u.username}</span> • {u.role === UserRole.HEAD_DRIVER ? 'Admin' : 'Pemandu'}
+                            </div>
                           </div>
                         </div>
-                      ))}
-                    </div>
+                        <div className="flex gap-2 justify-end">
+                          <button onClick={() => setEditingUser(u)} className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"><Edit2 className="w-4 h-4" /></button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleDeleteUser(u.id);
+                            }}
+                            className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                            title="Padam Pengguna"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
+                </div>
               </div>
 
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-amber-100 flex flex-col h-[650px]">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="p-2 bg-primary-100 rounded-lg text-primary-600">
-                      <Truck className="w-6 h-6" />
-                    </div>
-                    <h3 className="text-lg font-bold text-gray-800">Pengurusan Kenderaan</h3>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="p-2 bg-primary-100 rounded-lg text-primary-600">
+                    <Truck className="w-6 h-6" />
                   </div>
-                  
-                  <div className="space-y-3 pb-6 border-b border-gray-100">
-                    <div className="grid grid-cols-2 gap-2">
-                      <input 
-                        type="text" 
-                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none uppercase bg-white text-gray-900" 
-                        placeholder="Plat"
-                        value={newVehiclePlate}
-                        onChange={(e) => setNewVehiclePlate(e.target.value)}
-                      />
-                      <input 
-                        type="text" 
-                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white text-gray-900" 
-                        placeholder="Jenis"
-                        value={newVehicleModel}
-                        onChange={(e) => setNewVehicleModel(e.target.value)}
-                      />
-                    </div>
-                    <input 
-                      type="text"
-                      className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white text-gray-900 text-sm"
-                      placeholder="Jenama (Contoh: Toyota, Hino)"
-                      value={newVehicleType}
-                      onChange={(e) => setNewVehicleType(e.target.value)}
-                    />
-                    <button 
-                      onClick={handleAddVehicle}
-                      disabled={loading}
-                      className="w-full bg-primary-600 hover:bg-primary-700 text-white py-2 rounded-lg font-medium transition-colors flex justify-center items-center gap-2"
-                    >
-                      {loading ? '...' : <><Plus className="w-4 h-4" /> Tambah Kenderaan</>}
-                    </button>
-                  </div>
+                  <h3 className="text-lg font-bold text-gray-800">Pengurusan Kenderaan</h3>
+                </div>
 
-                  <div className="mt-4 flex-1 overflow-y-auto pr-2 custom-scrollbar">
-                    <h4 className="text-xs font-bold text-gray-400 uppercase mb-3">Senarai Kenderaan ({vehicles.length})</h4>
-                    <div className="space-y-2">
-                      {vehicles.map(v => (
-                        <div key={v.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors gap-3">
-                          <div className="min-w-0">
-                            <div className="text-sm font-bold text-gray-800">{v.plateNumber}</div>
-                            <div className="text-xs text-gray-500 flex items-center gap-1">
-                                {v.model} <span className="bg-primary-100 text-primary-800 px-1.5 rounded text-[10px] font-bold">{v.type}</span>
-                            </div>
-                          </div>
-                          <div className="flex gap-2 justify-end">
-                              <button onClick={() => setEditingVehicle(v)} className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"><Edit2 className="w-4 h-4" /></button>
-                              <button 
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  handleDeleteVehicle(v.id);
-                                }} 
-                                className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
-                                title="Padam Kenderaan"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                <div className="space-y-3 pb-6 border-b border-gray-100">
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none uppercase bg-white text-gray-900"
+                      placeholder="Plat"
+                      value={newVehiclePlate}
+                      onChange={(e) => setNewVehiclePlate(e.target.value)}
+                    />
+                    <input
+                      type="text"
+                      className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white text-gray-900"
+                      placeholder="Jenis"
+                      value={newVehicleModel}
+                      onChange={(e) => setNewVehicleModel(e.target.value)}
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white text-gray-900 text-sm"
+                    placeholder="Jenama (Contoh: Toyota, Hino)"
+                    value={newVehicleType}
+                    onChange={(e) => setNewVehicleType(e.target.value)}
+                  />
+                  <button
+                    onClick={handleAddVehicle}
+                    disabled={loading}
+                    className="w-full bg-primary-600 hover:bg-primary-700 text-white py-2 rounded-lg font-medium transition-colors flex justify-center items-center gap-2"
+                  >
+                    {loading ? '...' : <><Plus className="w-4 h-4" /> Tambah Kenderaan</>}
+                  </button>
+                </div>
+
+                <div className="mt-4 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                  <h4 className="text-xs font-bold text-gray-400 uppercase mb-3">Senarai Kenderaan ({vehicles.length})</h4>
+                  <div className="space-y-2">
+                    {vehicles.map(v => (
+                      <div key={v.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors gap-3">
+                        <div className="min-w-0">
+                          <div className="text-sm font-bold text-gray-800">{v.plateNumber}</div>
+                          <div className="text-xs text-gray-500 flex items-center gap-1">
+                            {v.model} <span className="bg-primary-100 text-primary-800 px-1.5 rounded text-[10px] font-bold">{v.type}</span>
                           </div>
                         </div>
-                      ))}
-                    </div>
+                        <div className="flex gap-2 justify-end">
+                          <button onClick={() => setEditingVehicle(v)} className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"><Edit2 className="w-4 h-4" /></button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleDeleteVehicle(v.id);
+                            }}
+                            className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                            title="Padam Kenderaan"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
+                </div>
               </div>
 
             </div>
