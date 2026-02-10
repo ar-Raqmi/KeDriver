@@ -216,6 +216,12 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
     return `${minutes} Minit`;
   };
 
+  const toTitleCase = (str: string) => {
+    return str.toLowerCase().split(' ').map(word =>
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+  };
+
   const getFilteredTrips = () => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -334,7 +340,7 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
     doc.setFontSize(9);
     doc.setTextColor(100);
     doc.text(`Dijana oleh: ${user.name}`, 14, 30);
-    doc.text(`Tarikh: ${format(new Date(), 'dd/MM/yyyy hh:mm a')}`, 14, 36);
+    doc.text(`Tarikh:\n${format(new Date(), 'dd/MM/yyyy hh:mm a')}`, 14, 36);
 
     if (selectedDriverFilter !== 'all') {
       const driverName = usersList.find(u => u.id === selectedDriverFilter)?.name || 'Unknown';
@@ -345,10 +351,10 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
       const vehicle = vehicles.find(v => v.id === t.vehicleId);
       const displayBrand = t.vehicleBrand || vehicle?.type || '-';
       const displayModel = t.vehicleModel || vehicle?.model || '-';
-      const formattedEndTime = t.endTime ? format(t.endTime, 'dd/MM/yyyy hh:mm a') : '-';
+      const formattedEndTime = t.endTime ? `${format(t.endTime, 'dd/MM/yyyy')}\n${format(t.endTime, 'hh:mm a')}` : '-';
 
       return [
-        format(t.startTime, 'dd/MM/yyyy hh:mm a'),
+        `${format(t.startTime, 'dd/MM/yyyy')}\n${format(t.startTime, 'hh:mm a')}`,
         formattedEndTime,
         t.driverName,
         t.plateNumber,
@@ -383,6 +389,83 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
     });
 
     doc.save(`Laporan_GerakJalan_${Date.now()}.pdf`);
+  };
+
+  const handleExportByDriver = () => {
+    if (typeof jspdf === 'undefined') {
+      alert("Modul PDF sedang dimuatkan, sila cuba sebentar lagi.");
+      return;
+    }
+
+    const doc = new jspdf.jsPDF('l', 'mm', 'a4');
+    const drivers = usersList.filter(u => u.role === UserRole.DRIVER)
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    drivers.forEach((driver, index) => {
+      if (index > 0) {
+        doc.addPage();
+      }
+
+      // Header
+      doc.setFontSize(14);
+      doc.setTextColor(245, 158, 11);
+      doc.setFont("helvetica", "bold");
+      doc.text(driver.name, 14, 20);
+
+      doc.setFontSize(9);
+      doc.setTextColor(100);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Dijana oleh: ${user.name}`, 14, 28);
+      doc.text(`Tarikh:\n${format(new Date(), 'dd/MM/yyyy hh:mm a')}`, 14, 34);
+
+      const driverTrips = filteredTrips.filter(t => t.driverId === driver.id);
+
+      if (driverTrips.length === 0) {
+        doc.setFontSize(12);
+        doc.setTextColor(220, 38, 38);
+        doc.text("Tiada Laporan", 14, 45);
+      } else {
+        const tableData = driverTrips.map(t => {
+          const vehicle = vehicles.find(v => v.id === t.vehicleId);
+          const displayBrand = t.vehicleBrand || vehicle?.type || '-';
+          const displayModel = t.vehicleModel || vehicle?.model || '-';
+          const formattedEndTime = t.endTime ? `${format(t.endTime, 'dd/MM/yyyy')}\n${format(t.endTime, 'hh:mm a')}` : '-';
+
+          return [
+            `${format(t.startTime, 'dd/MM/yyyy')}\n${format(t.startTime, 'hh:mm a')}`,
+            formattedEndTime,
+            t.plateNumber,
+            displayBrand,
+            displayModel,
+            t.origin + (t.destination ? ` > ${t.destination}` : ' > [Aktif]'),
+            t.passengers || '-',
+            t.remarks || '-',
+            formatDuration(t.durationMinutes)
+          ];
+        });
+
+        doc.autoTable({
+          startY: 40,
+          head: [['Mula', 'Tamat', 'Plat', 'Jenama', 'Jenis', 'Lokasi', 'Penumpang', 'Catatan', 'Tempoh']],
+          body: tableData,
+          theme: 'grid',
+          headStyles: { fillColor: [245, 158, 11] },
+          styles: { fontSize: 7, cellPadding: 2 },
+          columnStyles: {
+            0: { cellWidth: 25 },
+            1: { cellWidth: 25 },
+            2: { cellWidth: 20 },
+            3: { cellWidth: 20 },
+            4: { cellWidth: 20 },
+            6: { cellWidth: 25 },
+            7: { cellWidth: 25 },
+            8: { cellWidth: 15 },
+          }
+        });
+      }
+    });
+
+    doc.save(`Laporan_Pemandu_${Date.now()}.pdf`);
   };
 
   const handleSort = (key: SortKey) => {
@@ -779,7 +862,10 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                   </button>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={handleExportByDriver} className="bg-white border border-primary-600 text-primary-700 hover:bg-primary-50 px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm transition-colors">
+                    <Download className="w-4 h-4" /> Eksport Mengikut Pemandu
+                  </button>
                   <button onClick={handleExportPDF} className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-md transition-colors">
                     <Download className="w-4 h-4" /> Eksport PDF
                   </button>
@@ -812,10 +898,10 @@ const AdminView: React.FC<AdminViewProps> = ({ user, onLogout }) => {
                     >
                       <option value="all">Semua Pemandu</option>
                       {usersList
-                        .filter(u => u.role === UserRole.DRIVER || u.role === UserRole.HEAD_DRIVER)
+                        .filter(u => u.role === UserRole.DRIVER)
                         .sort((a, b) => a.name.localeCompare(b.name))
                         .map(u => (
-                          <option key={u.id} value={u.id}>{u.name}</option>
+                          <option key={u.id} value={u.id}>{toTitleCase(u.name)}</option>
                         ))}
                     </select>
                     <ArrowDown className="absolute right-3 top-3 text-gray-400 w-3 h-3 pointer-events-none" />
