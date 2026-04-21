@@ -90,4 +90,4 @@ KeDriver is a **Progressive Web App**. That means:
 *   **Security**: Always use **HTTPS** for the PWA "Install" button to work perfectly on Android.
 *   **Browsers**: Best experienced on Chrome (Android/PC) or Safari (iOS).
 
-Made with ❤️ for better transport management.
+Made with ❤️ for my workmates.
