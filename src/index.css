@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+@layer components {
+  body {
+    @apply bg-[#fff7ed] text-[#431407] font-sans antialiased;
+  }
+}
+

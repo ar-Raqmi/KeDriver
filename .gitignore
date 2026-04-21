@@ -1,3 +1,10 @@
-vite.config.ts
-node_modules
-package-lock.json
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+service-account.json
+firebaseConfig.ts

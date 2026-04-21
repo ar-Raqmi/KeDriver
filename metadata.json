@@ -1,5 +1,6 @@
 {
-  "name": "KeDriver - Log Pemandu",
-  "description": "Aplikasi pengurusan log perjalanan kenderaan untuk pemandu dan ketua pemandu dengan tema kuning Material Design.",
-  "requestFramePermissions": []
+  "name": "RideRequests Admin",
+  "description": "Mobile app with Material 3 Expressive Orange theme. Handles ride requests from users and allows Admin to group, schedule, and assign drivers.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
 }
