@@ -66,13 +66,14 @@ export function RequesterHome() {
   };
 
   const myRequests = requests.filter(r => r.requesterId === currentUser?.id).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'SCHEDULED' | 'PAST'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'SCHEDULED' | 'REJECTED' | 'PAST'>('ALL');
 
   const filteredRequests = myRequests.filter(req => {
     if (statusFilter === 'ALL') return true;
     if (statusFilter === 'PENDING') return req.status === 'PENDING';
     if (statusFilter === 'SCHEDULED') return req.status === 'SCHEDULED';
-    if (statusFilter === 'PAST') return ['COMPLETED', 'EXPIRED', 'REJECTED', 'CANCELLED'].includes(req.status);
+    if (statusFilter === 'REJECTED') return req.status === 'REJECTED';
+    if (statusFilter === 'PAST') return ['COMPLETED', 'EXPIRED', 'CANCELLED'].includes(req.status);
     return true;
   });
 
@@ -175,8 +176,8 @@ export function RequesterHome() {
           ) : (
             <motion.div key="status" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-4">
               <div className="flex bg-[#ea580c]/5 overflow-x-auto rounded-3xl p-1.5 mb-2 border border-[#ea580c]/10 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                {(['ALL', 'PENDING', 'SCHEDULED'] as const).map(f => {
-                  const labels = { ALL: 'SEMUA', PENDING: 'MENUNGGU', SCHEDULED: 'DITERIMA' };
+                {(['ALL', 'PENDING', 'SCHEDULED', 'REJECTED'] as const).map(f => {
+                  const labels = { ALL: 'SEMUA', PENDING: 'MENUNGGU', SCHEDULED: 'DITERIMA', REJECTED: 'DITOLAK' };
                   return (
                     <button
                       key={f}
@@ -215,11 +216,13 @@ export function RequesterHome() {
                               {req.timePreference}
                             </div>
                           </div>
-                          {req.status === 'PENDING' && (
+                          {['PENDING', 'COMPLETED', 'REJECTED'].includes(req.status) && (
                             <div className="flex items-center gap-2">
-                              <button onClick={() => handleEdit(req)} className="p-2 text-amber-600 bg-amber-50 rounded-xl hover:bg-amber-100 transition-colors">
-                                <Pencil size={16} />
-                              </button>
+                              {req.status === 'PENDING' && (
+                                <button onClick={() => handleEdit(req)} className="p-2 text-amber-600 bg-amber-50 rounded-xl hover:bg-amber-100 transition-colors">
+                                  <Pencil size={16} />
+                                </button>
+                              )}
                               <button onClick={() => handleDelete(req.id)} className="p-2 text-rose-600 bg-rose-50 rounded-xl hover:bg-rose-100 transition-colors">
                                 <Trash2 size={16} />
                               </button>

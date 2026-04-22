@@ -252,7 +252,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await deleteDoc(doc(db, 'rides', rideId));
     const now = Date.now();
     for (const id of ride.requestIds) {
-      await updateDoc(doc(db, 'requests', id), { status: 'PENDING', updatedAt: now });
+      await updateDoc(doc(db, 'requests', id), { status: 'REJECTED', updatedAt: now });
     }
   };
 
