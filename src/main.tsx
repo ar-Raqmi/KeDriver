@@ -18,6 +18,15 @@ function Main() {
       };
       if (document.readyState === 'complete') reg();
       else window.addEventListener('load', reg);
+
+      // Listen for the new service worker taking over
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+          refreshing = true;
+          window.location.reload();
+        }
+      });
     }
   }, []);
 
