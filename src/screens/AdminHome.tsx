@@ -121,7 +121,7 @@ export function AdminHome() {
   // USER MANAGEMENT STATE (FILTERING)
   const [userRoleFilter, setUserRoleFilter] = useState<'ALL' | UserRole>('ALL');
   const [userSearchQuery, setUserSearchQuery] = useState('');
-  
+
   // VEHICLE MANAGEMENT STATE (FILTERING)
   const [vehicleSearchQuery, setVehicleSearchQuery] = useState('');
   const [vehicleTypeFilter, setVehicleTypeFilter] = useState('ALL');
@@ -460,12 +460,12 @@ export function AdminHome() {
                         onChange={e => setSelectedDriverFilter(e.target.value)}
                         className="bg-[#fffaf5] border border-[#ea580c]/10 rounded-2xl px-4 py-3 outline-none font-bold text-sm focus:ring-1 focus:ring-[#ea580c]"
                       >
-                          <option value="all">Semua Pemandu</option>
-                          {users
-                            .filter(u => u.role === 'DRIVER')
-                            .sort((a, b) => (a.name || a.username).localeCompare(b.name || b.username))
-                            .map(u => <option key={u.id} value={u.id}>{u.name || u.username}</option>)}
-                        </select>
+                        <option value="all">Semua Pemandu</option>
+                        {users
+                          .filter(u => u.role === 'DRIVER')
+                          .sort((a, b) => (a.name || a.username).localeCompare(b.name || b.username))
+                          .map(u => <option key={u.id} value={u.id}>{u.name || u.username}</option>)}
+                      </select>
                     </div>
                   </div>
 
@@ -567,7 +567,7 @@ export function AdminHome() {
                               </>
                             ) : '-'}
                           </td>
-                          <td className="p-4 text-sm font-black">{trip.driverName}</td>
+                          <td className="p-4 text-sm font-black min-w-[240px]">{trip.driverName}</td>
                           <td className="p-4">
                             <div className="flex flex-col gap-1.5 min-w-[100px]">
                               <Plate number={trip.plateNumber} />
@@ -583,7 +583,7 @@ export function AdminHome() {
                             {trip.destination && <span className="mx-2 text-[#ea580c]">→</span>}
                             {trip.destination}
                           </td>
-                          <td className="p-4 text-[11px] font-bold text-[#431407]/60 max-w-[120px] truncate">{trip.passengers}</td>
+                          <td className="p-4 text-[11px] font-bold text-[#431407]/60 min-w-[120px]">{trip.passengers}</td>
                           <td className="p-4 text-[11px] font-medium text-[#431407]/50 min-w-[200px] whitespace-pre-wrap">{trip.remarks || '-'}</td>
                           <td className="p-4">
                             <Badge status={trip.status}>{trip.status}</Badge>
@@ -684,8 +684,8 @@ export function AdminHome() {
                           className="w-full pl-11 pr-4 py-3 bg-white border border-[#ea580c]/10 rounded-2xl font-bold outline-none ring-[#ea580c] focus:ring-1 transition-all shadow-sm text-sm"
                         />
                       </div>
-                      <select 
-                        value={vehicleTypeFilter} 
+                      <select
+                        value={vehicleTypeFilter}
                         onChange={e => setVehicleTypeFilter(e.target.value)}
                         className="bg-white border border-[#ea580c]/10 rounded-2xl px-4 py-3 outline-none font-bold text-xs focus:ring-1 focus:ring-[#ea580c] shadow-sm uppercase tracking-wider"
                       >
@@ -700,17 +700,17 @@ export function AdminHome() {
                       ) : filteredVehicles.map(v => (
                         <Card key={v.id} className="!p-4 border border-[#ea580c]/5 hover:border-[#ea580c]/20 transition-all group relative overflow-hidden bg-white hover:shadow-md">
                           <div className="flex justify-between items-start">
-                             <div className="flex-1">
-                               <Plate number={v.plateNumber} className="text-sm py-1 px-3 mb-2" />
-                               <div className="text-[11px] font-black text-[#431407] uppercase truncate max-w-[150px]">{v.model}</div>
-                               <div className="flex items-center gap-2 mt-1.5">
-                                 <span className="text-[9px] font-black uppercase text-[#ea580c] bg-[#ea580c]/5 px-2 py-0.5 rounded-md border border-[#ea580c]/10">{v.type}</span>
-                               </div>
-                             </div>
-                             <div className="flex flex-col gap-1">
-                               <button onClick={() => { setEditingVehicle(v); setShowVehicleModal(true); }} className="p-2 text-[#ea580c] hover:bg-[#ea580c]/5 rounded-xl transition-all"><Edit2 size={16} /></button>
-                               <button onClick={() => { if (window.confirm('Padam kenderaan?')) deleteVehicle(v.id); }} className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={16} /></button>
-                             </div>
+                            <div className="flex-1">
+                              <Plate number={v.plateNumber} className="text-sm py-1 px-3 mb-2" />
+                              <div className="text-[11px] font-black text-[#431407] uppercase truncate max-w-[150px]">{v.model}</div>
+                              <div className="flex items-center gap-2 mt-1.5">
+                                <span className="text-[9px] font-black uppercase text-[#ea580c] bg-[#ea580c]/5 px-2 py-0.5 rounded-md border border-[#ea580c]/10">{v.type}</span>
+                              </div>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <button onClick={() => { setEditingVehicle(v); setShowVehicleModal(true); }} className="p-2 text-[#ea580c] hover:bg-[#ea580c]/5 rounded-xl transition-all"><Edit2 size={16} /></button>
+                              <button onClick={() => { if (window.confirm('Padam kenderaan?')) deleteVehicle(v.id); }} className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={16} /></button>
+                            </div>
                           </div>
                         </Card>
                       ))}
