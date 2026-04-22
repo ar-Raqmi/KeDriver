@@ -200,6 +200,9 @@ export function AdminHome() {
       theme: 'grid',
       headStyles: { fillColor: [234, 88, 12] },
       styles: { fontSize: 7, cellPadding: 2 },
+      columnStyles: {
+        7: { cellWidth: 50 },
+      },
     });
 
     doc.save(`Laporan_KeDriver_Paparan_${Date.now()}.pdf`);
@@ -265,7 +268,7 @@ export function AdminHome() {
             4: { cellWidth: 20 },
             5: { cellWidth: 35 },
             6: { cellWidth: 20 },
-            7: { cellWidth: 25 },
+            7: { cellWidth: 50 },
             8: { cellWidth: 15 },
           }
         });
@@ -457,9 +460,12 @@ export function AdminHome() {
                         onChange={e => setSelectedDriverFilter(e.target.value)}
                         className="bg-[#fffaf5] border border-[#ea580c]/10 rounded-2xl px-4 py-3 outline-none font-bold text-sm focus:ring-1 focus:ring-[#ea580c]"
                       >
-                        <option value="all">Semua Pemandu</option>
-                        {users.filter(u => u.role === 'DRIVER').map(u => <option key={u.id} value={u.id}>{u.name || u.username}</option>)}
-                      </select>
+                          <option value="all">Semua Pemandu</option>
+                          {users
+                            .filter(u => u.role === 'DRIVER')
+                            .sort((a, b) => (a.name || a.username).localeCompare(b.name || b.username))
+                            .map(u => <option key={u.id} value={u.id}>{u.name || u.username}</option>)}
+                        </select>
                     </div>
                   </div>
 
@@ -541,6 +547,7 @@ export function AdminHome() {
                         <LogHeader label="Kenderaan" sortKey="plateNumber" currentKey={sortKey} order={sortOrder} onClick={setSortKey} onOrder={setSortOrder} />
                         <th className="p-4 text-[11px] font-black uppercase text-[#ea580c]/60">Lokasi / Destinasi</th>
                         <th className="p-4 text-[11px] font-black uppercase text-[#ea580c]/60">Penumpang</th>
+                        <th className="p-4 text-[11px] font-black uppercase text-[#ea580c]/60">Catatan</th>
                         <th className="p-4 text-[11px] font-black uppercase text-[#ea580c]/60">Status</th>
                         <th className="p-4"></th>
                       </tr>
@@ -577,6 +584,7 @@ export function AdminHome() {
                             {trip.destination}
                           </td>
                           <td className="p-4 text-[11px] font-bold text-[#431407]/60 max-w-[120px] truncate">{trip.passengers}</td>
+                          <td className="p-4 text-[11px] font-medium text-[#431407]/50 min-w-[200px] whitespace-pre-wrap">{trip.remarks || '-'}</td>
                           <td className="p-4">
                             <Badge status={trip.status}>{trip.status}</Badge>
                           </td>
