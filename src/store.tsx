@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, RideRequest, Ride, UserRole, Trip, Vehicle } from './types';
 import { getTodayStrGMT8 } from './lib/dateUtils';
-import { db, seedAdmin } from './lib/firebase';
+import { db } from './lib/firebase';
 import { 
   collection, 
   onSnapshot, 
@@ -78,8 +78,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setState(prev => ({ ...prev, currentUser: JSON.parse(savedUser) }));
     }
     
-    // Seed admin on first load
-    seedAdmin();
+
   }, []);
 
   // Real-time Sync

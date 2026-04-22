@@ -23,24 +23,4 @@ enableIndexedDbPersistence(db).catch((err) => {
     }
 });
 
-export async function seedAdmin() {
-  try {
-    const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('role', '==', 'ADMIN'));
-    const snapshot = await getDocs(q);
-    
-    if (snapshot.empty) {
-      await addDoc(usersRef, {
-        username: 'admin',
-        password: 'password123',
-        role: 'ADMIN',
-        name: 'System Admin',
-        createdAt: Date.now()
-      });
-    }
-  } catch (error) {
-    console.error("Error seeding admin:", error);
-  }
-}
-
 export { db };
