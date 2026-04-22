@@ -587,6 +587,13 @@ export function AdminHome() {
                           <td className="p-4 text-[11px] font-medium text-[#431407]/50 min-w-[200px] whitespace-pre-wrap">{trip.remarks || '-'}</td>
                           <td className="p-4">
                             <Badge status={trip.status}>{trip.status}</Badge>
+                            <div className="text-[10px] font-black text-[#431407]/40 mt-1">
+                              {trip.durationMinutes ? (
+                                trip.durationMinutes >= 60 
+                                  ? `${Math.floor(trip.durationMinutes / 60)}j ${trip.durationMinutes % 60}m`
+                                  : `${trip.durationMinutes}m`
+                              ) : '-'}
+                            </div>
                           </td>
                           <td className="p-4 flex gap-1">
                             <button onClick={() => openEditTrip(trip)} className="p-2 text-[#ea580c] hover:bg-[#ea580c]/5 rounded-lg"><Edit2 size={16} /></button>
