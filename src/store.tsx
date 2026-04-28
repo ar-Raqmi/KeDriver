@@ -56,6 +56,7 @@ interface AppContextType extends State {
   // Request Management
   deleteRequest: (requestId: string) => Promise<void>;
   updateRequest: (requestId: string, req: Partial<RideRequest>) => Promise<void>;
+  cleanupOldData: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -285,11 +286,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await updateDoc(doc(db, 'requests', id), data as any);
   };
 
-  const cleanupPastRequests = async () => {
+  const cleanupOldData = async () => {
     const today = getTodayStrGMT8();
-    const past = state.requests.filter(r => r.date < today);
-    for (const req of past) {
+    
+    // 1. Cleanup Requests older than today
+    const pastRequests = state.requests.filter(r => r.date < today);
+    for (const req of pastRequests) {
       await deleteDoc(doc(db, 'requests', req.id));
+    }
+
+    // 2. Cleanup Rides that are COMPLETED and older than today
+    const pastRides = state.rides.filter(r => r.status === 'COMPLETED' && r.date < today);
+    for (const ride of pastRides) {
+      await deleteDoc(doc(db, 'rides', ride.id));
+    }
+
+    // 3. Cleanup Trips (Logs) that are COMPLETED and older than 48 hours
+    const twoDaysAgo = Date.now() - (48 * 60 * 60 * 1000);
+    const oldTrips = state.trips.filter(t => t.status === 'COMPLETED' && t.endTime && t.endTime < twoDaysAgo);
+    for (const trip of oldTrips) {
+      await deleteDoc(doc(db, 'trips', trip.id));
     }
   };
 
@@ -315,7 +331,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteTrip,
       deleteRequest,
       updateRequest,
-      cleanupPastRequests
+      cleanupOldData
     }}>
       {children}
     </AppContext.Provider>

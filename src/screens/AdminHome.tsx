@@ -7,7 +7,7 @@ import {
   Truck, ArrowUp, ArrowDown, Edit2, FileText, UserPlus, Car
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { formatTo12Hour, formatToDDMMYYYY, getDayOfWeek, formatToDateTime, getGroupHeader } from '../lib/dateUtils';
+import { formatTo12Hour, formatToDDMMYYYY, getDayOfWeek, formatToDateTime, getGroupHeader, getTodayStrGMT8 } from '../lib/dateUtils';
 import { User, Vehicle, Trip, UserRole } from '../types';
 import { format } from 'date-fns';
 import jsPDF from 'jspdf';
@@ -29,8 +29,12 @@ export function AdminHome() {
     scheduleRide, rejectRequests, completeRide, deleteRide,
     addUser, updateUser, deleteUser,
     addVehicle, updateVehicle, deleteVehicle,
-    deleteTrip, updateTrip, deleteRequest, cleanupPastRequests
+    deleteTrip, updateTrip, deleteRequest, cleanupOldData
   } = useAppStore();
+
+  useEffect(() => {
+    cleanupOldData();
+  }, []);
 
   const [activeTab, setActiveTab] = useState<AdminTab>('RIDES');
   const [rideTab, setRideTab] = useState<'PENDING' | 'SCHEDULED'>('PENDING');
@@ -371,7 +375,7 @@ export function AdminHome() {
                     Permohonan ({pendingRequests.length})
                   </button>
                   <button onClick={() => setRideTab('SCHEDULED')} className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${rideTab === 'SCHEDULED' ? 'bg-[#ea580c] text-white shadow-lg' : 'text-[#ea580c]/60'}`}>
-                    Berjadual ({rides.filter(r => r.status !== 'COMPLETED').length})
+                    Berjadual ({rides.filter(r => r.status !== 'COMPLETED' && r.date >= getTodayStrGMT8()).length})
                   </button>
                 </div>
 
@@ -408,11 +412,16 @@ export function AdminHome() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {rides.filter(r => r.status !== 'COMPLETED').length === 0 ? <EmptyState icon={<Clock size={48} />} label="Tiada perjalanan berjadual" /> :
-                      rides.slice().reverse().map(ride => (
-                        <RideCard key={ride.id} ride={ride} requests={requests} />
-                      ))
-                    }
+                    {(() => {
+                      const activeRides = rides.filter(r => r.status !== 'COMPLETED' && r.date >= getTodayStrGMT8());
+                      return activeRides.length === 0 ? (
+                        <EmptyState icon={<Clock size={48} />} label="Tiada perjalanan berjadual" />
+                      ) : (
+                        activeRides.slice().reverse().map(ride => (
+                          <RideCard key={ride.id} ride={ride} requests={requests} />
+                        ))
+                      );
+                    })()}
                   </div>
                 )}
               </motion.div>
