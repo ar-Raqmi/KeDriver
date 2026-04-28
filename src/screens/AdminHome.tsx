@@ -413,11 +413,22 @@ export function AdminHome() {
                 ) : (
                   <div className="space-y-4">
                     {(() => {
-                      const activeRides = rides.filter(r => r.status !== 'COMPLETED' && r.date >= getTodayStrGMT8());
+                      const activeRides = rides
+                        .filter(r => r.status !== 'COMPLETED' && r.date >= getTodayStrGMT8())
+                        .sort((a, b) => {
+                          const dateA = a.date || "";
+                          const dateB = b.date || "";
+                          const dateDiff = dateA.localeCompare(dateB);
+                          if (dateDiff !== 0) return dateDiff;
+                          const timeA = a.time || "";
+                          const timeB = b.time || "";
+                          return timeA.localeCompare(timeB);
+                        });
+
                       return activeRides.length === 0 ? (
                         <EmptyState icon={<Clock size={48} />} label="Tiada perjalanan berjadual" />
                       ) : (
-                        activeRides.slice().reverse().map(ride => (
+                        activeRides.map(ride => (
                           <RideCard key={ride.id} ride={ride} requests={requests} />
                         ))
                       );
