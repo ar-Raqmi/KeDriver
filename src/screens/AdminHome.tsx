@@ -446,7 +446,7 @@ export function AdminHome() {
             )}
 
             {activeTab === 'JADUAL' && (
-              <motion.div key="jadual" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
+              <motion.div key="jadual" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6 pb-20">
                 {!selectedDriverId ? (
                   <div className="space-y-6">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -494,28 +494,30 @@ export function AdminHome() {
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-6">
-                    <div className="flex items-center gap-4">
+                  <div className="space-y-8">
+                    <div className="flex items-start gap-5">
                       <button 
                         onClick={() => setSelectedDriverId(null)}
-                        className="p-3 bg-white border border-[#ea580c]/10 rounded-2xl text-[#ea580c] hover:bg-[#ea580c]/5 transition-all shadow-sm"
+                        className="mt-1 p-4 bg-white border border-[#ea580c]/5 rounded-[20px] text-[#ea580c] hover:bg-[#ea580c]/5 transition-all shadow-sm"
                       >
-                        <ChevronLeft size={20} />
+                        <ChevronLeft size={24} />
                       </button>
-                      <div>
-                        <h2 className="text-2xl font-black">
+                      <div className="flex-1">
+                        <h2 className="text-3xl font-black text-[#431407] leading-tight max-w-[300px]">
                           {users.find(u => u.id === selectedDriverId)?.name || users.find(u => u.id === selectedDriverId)?.username}
                         </h2>
-                        <p className="text-sm font-bold text-[#431407]/40 uppercase tracking-widest">Jadual Perjalanan Bulanan</p>
+                        <p className="text-[11px] font-black text-[#431407]/30 uppercase tracking-[0.2em] mt-2">Jadual Perjalanan Bulanan</p>
                       </div>
                     </div>
 
-                    <MonthlyTimetable 
-                      driverId={selectedDriverId} 
-                      trips={trips} 
-                      currentMonth={currentMonth} 
-                      onMonthChange={setCurrentMonth} 
-                    />
+                    <div className="bg-white rounded-[40px] shadow-sm border border-[#ea580c]/10 overflow-hidden">
+                      <MonthlyTimetable 
+                        driverId={selectedDriverId} 
+                        trips={trips} 
+                        currentMonth={currentMonth} 
+                        onMonthChange={setCurrentMonth} 
+                      />
+                    </div>
                   </div>
                 )}
               </motion.div>
@@ -1393,87 +1395,93 @@ function MonthlyTimetable({ driverId, trips, currentMonth, onMonthChange }: { dr
   const malayDays = ['Ahad', 'Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat', 'Sabtu'];
 
   return (
-    <div className="bg-white rounded-[32px] border border-[#ea580c]/10 shadow-sm overflow-hidden">
+    <div className="bg-white">
       {/* Calendar Header */}
-      <div className="p-6 border-b border-[#ea580c]/5 flex items-center justify-between bg-[#fffaf5]/50">
-        <div className="flex items-center gap-4">
-          <button onClick={() => onMonthChange(subMonths(currentMonth, 1))} className="p-2 hover:bg-[#ea580c]/5 rounded-xl text-[#ea580c] transition-all">
-            <ChevronLeft size={24} />
+      <div className="p-8 pb-4 flex items-center justify-between">
+        <div className="flex items-center gap-6">
+          <button onClick={() => onMonthChange(subMonths(currentMonth, 1))} className="p-1 text-[#ea580c] hover:opacity-60 transition-all">
+            <ChevronLeft size={28} strokeWidth={3} />
           </button>
-          <h3 className="text-xl font-black text-[#431407] min-w-[150px] text-center capitalize">
+          <h3 className="text-2xl font-black text-[#431407] min-w-[140px] text-center capitalize tracking-tight">
             {format(currentMonth, 'MMMM yyyy')}
           </h3>
-          <button onClick={() => onMonthChange(addMonths(currentMonth, 1))} className="p-2 hover:bg-[#ea580c]/5 rounded-xl text-[#ea580c] transition-all">
-            <ChevronRight size={24} />
+          <button onClick={() => onMonthChange(addMonths(currentMonth, 1))} className="p-1 text-[#ea580c] hover:opacity-60 transition-all">
+            <ChevronRight size={28} strokeWidth={3} />
           </button>
         </div>
         <button 
           onClick={() => onMonthChange(new Date())}
-          className="px-4 py-2 bg-white border border-[#ea580c]/20 rounded-xl text-xs font-black text-[#ea580c] hover:bg-[#ea580c] hover:text-white transition-all shadow-sm"
+          className="px-6 py-3 bg-white border border-[#ea580c]/10 rounded-[18px] text-xs font-black text-[#ea580c] hover:bg-[#ea580c]/5 transition-all shadow-sm"
         >
           Hari Ini
         </button>
       </div>
 
-      {/* Days of Week */}
-      <div className="grid grid-cols-7 border-b border-[#ea580c]/5 bg-[#fffaf5]/30">
-        {malayDays.map(day => (
-          <div key={day} className="py-3 text-center text-[10px] font-black uppercase text-[#ea580c]/40 tracking-widest border-r border-[#ea580c]/5 last:border-r-0">
-            {day}
+      <div className="overflow-x-auto no-scrollbar scroll-smooth">
+        <div className="min-w-[800px] md:min-w-0">
+          {/* Days of Week */}
+          <div className="grid grid-cols-7 border-b border-[#ea580c]/5">
+            {malayDays.map(day => (
+              <div key={day} className="py-6 text-center text-[10px] font-black uppercase text-[#ea580c]/30 tracking-[0.2em] border-r border-[#ea580c]/5 last:border-r-0">
+                {day}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      {/* Calendar Grid */}
-      <div className="grid grid-cols-7">
-        {calendarDays.map((day, idx) => {
-          const isCurrentMonth = isSameMonth(day, monthStart);
-          const dayTrips = driverTrips.filter(t => isSameDay(new Date(t.startTime), day));
-          const isToday = isSameDay(day, new Date());
+          {/* Calendar Grid */}
+          <div className="grid grid-cols-7">
+            {calendarDays.map((day, idx) => {
+              const isCurrentMonth = isSameMonth(day, monthStart);
+              const dayTrips = driverTrips.filter(t => isSameDay(new Date(t.startTime), day));
+              const isToday = isSameDay(day, new Date());
 
-          return (
-            <div 
-              key={day.toString()} 
-              className={`min-h-[140px] p-2 border-r border-b border-[#ea580c]/5 last:border-r-0 relative flex flex-col gap-1 transition-colors ${!isCurrentMonth ? 'bg-gray-50/50' : 'bg-white'} ${isToday ? 'bg-orange-50/30' : ''}`}
-            >
-              <div className="flex justify-between items-start mb-1">
-                <span className={`text-xs font-black ${!isCurrentMonth ? 'text-[#431407]/20' : isToday ? 'text-[#ea580c]' : 'text-[#431407]/40'}`}>
-                  {format(day, 'd')}
-                </span>
-                {isToday && <div className="w-1.5 h-1.5 rounded-full bg-[#ea580c] animate-pulse" />}
-              </div>
-
-              <div className="flex-1 space-y-1 overflow-y-auto no-scrollbar">
-                {dayTrips.length > 0 ? (
-                  dayTrips.map(trip => (
-                    <div key={trip.id} className="group relative">
-                      <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-1.5 text-[10px] leading-tight">
-                        <div className="flex items-center gap-1 font-black text-emerald-700">
-                          <ArrowUp size={8} /> {format(trip.startTime, 'hh:mm a')} <span className="opacity-40">IN</span>
-                        </div>
-                        {trip.endTime && (
-                          <div className="flex items-center gap-1 font-black text-blue-600 mt-0.5">
-                            <ArrowDown size={8} /> {format(trip.endTime, 'hh:mm a')} <span className="opacity-40">OUT</span>
-                          </div>
-                        )}
-                        <div className="mt-1 text-[8px] font-bold text-emerald-900/40 truncate">
-                          {trip.plateNumber} • {trip.origin}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                ) : isCurrentMonth ? (
-                  <div className="h-full flex flex-col items-center justify-center py-4 opacity-40">
-                    <div className="text-red-500/60 mb-1">
-                      <X size={14} strokeWidth={3} />
-                    </div>
-                    <span className="text-[8px] font-black uppercase text-red-500/60 tracking-tighter text-center">Tiada Pemanduan</span>
+              return (
+                <div 
+                  key={day.toString()} 
+                  className={`min-h-[220px] p-3 border-r border-b border-[#ea580c]/5 last:border-r-0 relative flex flex-col gap-2 transition-colors ${!isCurrentMonth ? 'bg-gray-50/30' : 'bg-white'} ${isToday ? 'bg-orange-50/20' : ''}`}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <span className={`text-[13px] font-black ${!isCurrentMonth ? 'text-[#431407]/10' : isToday ? 'text-[#ea580c]' : 'text-[#431407]/20'}`}>
+                      {format(day, 'd')}
+                    </span>
+                    {isToday && <div className="w-1.5 h-1.5 rounded-full bg-[#ea580c]" />}
                   </div>
-                ) : null}
-              </div>
-            </div>
-          );
-        })}
+
+                  <div className="flex-1 space-y-2 overflow-y-auto no-scrollbar">
+                    {dayTrips.length > 0 ? (
+                      dayTrips.map(trip => (
+                        <div key={trip.id} className="bg-emerald-50/60 border border-emerald-100 rounded-[14px] p-2 text-[10px] leading-tight">
+                          <div className="flex flex-col font-black text-emerald-700 gap-0.5">
+                            <div className="flex items-center justify-between">
+                              <span>{format(trip.startTime, 'hh:mm')}</span>
+                              <span className="text-[8px] opacity-40">AM</span>
+                            </div>
+                            {trip.endTime && (
+                              <div className="flex items-center justify-between text-blue-600 border-t border-emerald-100 mt-1 pt-1">
+                                <span>{format(trip.endTime, 'hh:mm')}</span>
+                                <span className="text-[8px] opacity-40">PM</span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="mt-1.5 text-[8px] font-bold text-emerald-900/30 truncate">
+                            {trip.plateNumber}
+                          </div>
+                        </div>
+                      ))
+                    ) : isCurrentMonth ? (
+                      <div className="h-full flex flex-col items-center justify-center py-6 opacity-30">
+                        <div className="text-red-400 mb-1.5">
+                          <X size={16} strokeWidth={3} />
+                        </div>
+                        <span className="text-[9px] font-black uppercase text-red-400 tracking-tighter text-center leading-tight">Tiada<br/>Mandu</span>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );
