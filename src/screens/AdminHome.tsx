@@ -9,7 +9,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { formatTo12Hour, formatToDDMMYYYY, getDayOfWeek, formatToDateTime, getGroupHeader, getTodayStrGMT8 } from '../lib/dateUtils';
 import { User, Vehicle, Trip, UserRole } from '../types';
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from 'date-fns';
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, addWeeks, subWeeks } from 'date-fns';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -1383,58 +1383,143 @@ function EditTripModal({ trip, startStr, setStartStr, endStr, setEndStr, onClose
 }
 
 function MonthlyTimetable({ driverId, trips, currentMonth, onMonthChange }: { driverId: string, trips: Trip[], currentMonth: Date, onMonthChange: (d: Date) => void }) {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(monthStart);
-  const startDate = startOfWeek(monthStart);
-  const endDate = endOfWeek(monthEnd);
+  
+  // On mobile, we show one week. On desktop, the whole month.
+  const startDate = isMobile ? startOfWeek(currentMonth) : startOfWeek(monthStart);
+  const endDate = isMobile ? endOfWeek(currentMonth) : endOfWeek(monthEnd);
 
   const calendarDays = eachDayOfInterval({ start: startDate, end: endDate });
-  
   const driverTrips = useMemo(() => trips.filter(t => t.driverId === driverId), [trips, driverId]);
-
   const malayDays = ['Ahad', 'Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat', 'Sabtu'];
+
+  const handlePrev = () => {
+    onMonthChange(isMobile ? subWeeks(currentMonth, 1) : subMonths(currentMonth, 1));
+  };
+
+  const handleNext = () => {
+    onMonthChange(isMobile ? addWeeks(currentMonth, 1) : addMonths(currentMonth, 1));
+  };
 
   return (
     <div className="bg-white">
       {/* Calendar Header */}
-      <div className="p-8 pb-4 flex items-center justify-between">
-        <div className="flex items-center gap-6">
-          <button onClick={() => onMonthChange(subMonths(currentMonth, 1))} className="p-1 text-[#ea580c] hover:opacity-60 transition-all">
-            <ChevronLeft size={28} strokeWidth={3} />
+      <div className="p-6 md:p-8 pb-4 flex items-center justify-between">
+        <div className="flex items-center gap-4 md:gap-6">
+          <button onClick={handlePrev} className="p-1 text-[#ea580c] hover:opacity-60 transition-all">
+            <ChevronLeft size={isMobile ? 24 : 28} strokeWidth={3} />
           </button>
-          <h3 className="text-2xl font-black text-[#431407] min-w-[140px] text-center capitalize tracking-tight">
-            {format(currentMonth, 'MMMM yyyy')}
-          </h3>
-          <button onClick={() => onMonthChange(addMonths(currentMonth, 1))} className="p-1 text-[#ea580c] hover:opacity-60 transition-all">
-            <ChevronRight size={28} strokeWidth={3} />
+          <div className="text-center min-w-[120px] md:min-w-[140px]">
+            <h3 className="text-lg md:text-2xl font-black text-[#431407] capitalize tracking-tight">
+              {format(currentMonth, 'MMMM yyyy')}
+            </h3>
+            {isMobile && (
+              <p className="text-[10px] font-black text-[#ea580c] uppercase tracking-widest mt-0.5">
+                {format(startDate, 'dd/MM')} — {format(endDate, 'dd/MM')}
+              </p>
+            )}
+          </div>
+          <button onClick={handleNext} className="p-1 text-[#ea580c] hover:opacity-60 transition-all">
+            <ChevronRight size={isMobile ? 24 : 28} strokeWidth={3} />
           </button>
         </div>
         <button 
           onClick={() => onMonthChange(new Date())}
-          className="px-6 py-3 bg-white border border-[#ea580c]/10 rounded-[18px] text-xs font-black text-[#ea580c] hover:bg-[#ea580c]/5 transition-all shadow-sm"
+          className="px-4 py-2 md:px-6 md:py-3 bg-white border border-[#ea580c]/10 rounded-[14px] md:rounded-[18px] text-[10px] md:text-xs font-black text-[#ea580c] hover:bg-[#ea580c]/5 transition-all shadow-sm"
         >
           Hari Ini
         </button>
       </div>
 
-      <div className="overflow-x-auto no-scrollbar scroll-smooth">
-        <div className="min-w-[800px] md:min-w-0">
-          {/* Days of Week */}
-          <div className="grid grid-cols-7 border-b border-[#ea580c]/5">
-            {malayDays.map(day => (
-              <div key={day} className="py-6 text-center text-[10px] font-black uppercase text-[#ea580c]/30 tracking-[0.2em] border-r border-[#ea580c]/5 last:border-r-0">
-                {day}
-              </div>
-            ))}
-          </div>
+      <div className={`${isMobile ? '' : 'overflow-x-auto no-scrollbar scroll-smooth'}`}>
+        <div className={`${isMobile ? 'p-4 space-y-3' : 'min-w-[800px] md:min-w-0'}`}>
+          {!isMobile && (
+            <div className="grid grid-cols-7 border-b border-[#ea580c]/5">
+              {malayDays.map(day => (
+                <div key={day} className="py-6 text-center text-[10px] font-black uppercase text-[#ea580c]/30 tracking-[0.2em] border-r border-[#ea580c]/5 last:border-r-0">
+                  {day}
+                </div>
+              ))}
+            </div>
+          )}
 
-          {/* Calendar Grid */}
-          <div className="grid grid-cols-7">
-            {calendarDays.map((day, idx) => {
+          <div className={isMobile ? 'space-y-4' : 'grid grid-cols-7'}>
+            {calendarDays.map((day) => {
               const isCurrentMonth = isSameMonth(day, monthStart);
               const dayTrips = driverTrips.filter(t => isSameDay(new Date(t.startTime), day));
               const isToday = isSameDay(day, new Date());
 
+              if (isMobile) {
+                return (
+                  <div 
+                    key={day.toString()} 
+                    className={`p-4 rounded-[28px] border transition-all ${isToday ? 'bg-orange-50/40 border-[#ea580c]/20 shadow-sm' : 'bg-white border-[#ea580c]/5'}`}
+                  >
+                    <div className="flex justify-between items-center mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-2xl flex flex-col items-center justify-center font-black ${isToday ? 'bg-[#ea580c] text-white' : 'bg-[#fffaf5] text-[#431407]/40'}`}>
+                          <span className="text-[10px] leading-none uppercase">{format(day, 'EEE')}</span>
+                          <span className="text-sm leading-none mt-1">{format(day, 'd')}</span>
+                        </div>
+                        <div>
+                          <div className="font-black text-[#431407]">{malayDays[day.getDay()]}</div>
+                          <div className="text-[10px] font-bold text-[#431407]/30">{format(day, 'dd MMMM yyyy')}</div>
+                        </div>
+                      </div>
+                      {dayTrips.length > 0 && (
+                        <div className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider">
+                          {dayTrips.length} Sesi
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      {dayTrips.length > 0 ? (
+                        dayTrips.map(trip => (
+                          <div key={trip.id} className="bg-[#fffaf5] border border-[#ea580c]/5 rounded-[20px] p-4 flex items-center justify-between">
+                            <div className="flex gap-4">
+                              <div className="flex flex-col gap-1 border-r border-[#ea580c]/10 pr-4">
+                                <div className="text-xs font-black text-emerald-600 flex items-center gap-1">
+                                  <ArrowUp size={12} /> {format(trip.startTime, 'hh:mm a')}
+                                </div>
+                                {trip.endTime && (
+                                  <div className="text-xs font-black text-blue-600 flex items-center gap-1">
+                                    <ArrowDown size={12} /> {format(trip.endTime, 'hh:mm a')}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex flex-col justify-center">
+                                <div className="text-[10px] font-black uppercase text-[#ea580c]">{trip.plateNumber}</div>
+                                <div className="text-xs font-bold text-[#431407]/60 truncate max-w-[120px]">{trip.origin}</div>
+                              </div>
+                            </div>
+                            <div className="p-2 bg-white rounded-xl text-[#ea580c]/20">
+                              <ChevronRight size={16} />
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="flex items-center gap-3 py-2 px-4 opacity-20">
+                          <X size={16} strokeWidth={3} className="text-red-500" />
+                          <span className="text-xs font-black uppercase tracking-widest text-red-500">Tiada Pemanduan</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+
+              // DESKTOP GRID (unchanged logic, just wrapped)
               return (
                 <div 
                   key={day.toString()} 
