@@ -9,7 +9,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { formatTo12Hour, formatToDDMMYYYY, getDayOfWeek, formatToDateTime, getGroupHeader, getTodayStrGMT8 } from '../lib/dateUtils';
 import { User, Vehicle, Trip, UserRole } from '../types';
-import { format } from 'date-fns';
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from 'date-fns';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -20,7 +20,7 @@ declare module 'jspdf' {
   }
 }
 
-type AdminTab = 'RIDES' | 'LOGS' | 'SYSTEM';
+type AdminTab = 'RIDES' | 'LOGS' | 'JADUAL' | 'SYSTEM';
 type SortKey = 'startTime' | 'endTime' | 'driverName' | 'plateNumber' | 'origin' | 'status' | 'remarks';
 
 export function AdminHome() {
@@ -168,6 +168,11 @@ export function AdminHome() {
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
   const [editTripStartStr, setEditTripStartStr] = useState('');
   const [editTripEndStr, setEditTripEndStr] = useState('');
+  
+  // JADUAL (TIMETABLE) STATE
+  const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [timetableSearch, setTimetableSearch] = useState('');
 
 
   const handleExportPDF = () => {
@@ -330,6 +335,7 @@ export function AdminHome() {
         <nav className="flex-1 px-4 space-y-2">
           <SidebarButton active={activeTab === 'RIDES'} onClick={() => setActiveTab('RIDES')} icon={<Calendar size={20} />} label="Permohonan" />
           <SidebarButton active={activeTab === 'LOGS'} onClick={() => setActiveTab('LOGS')} icon={<FileText size={20} />} label="Log Perjalanan" />
+          <SidebarButton active={activeTab === 'JADUAL'} onClick={() => setActiveTab('JADUAL')} icon={<Clock size={20} />} label="Jadual Pemandu" />
           <SidebarButton active={activeTab === 'SYSTEM'} onClick={() => setActiveTab('SYSTEM')} icon={<Settings size={20} />} label="Pengurusan Sistem" />
         </nav>
 
@@ -363,6 +369,7 @@ export function AdminHome() {
         <div className="md:hidden flex bg-white border-b border-[#ea580c]/10 p-1">
           <MobileTab active={activeTab === 'RIDES'} onClick={() => setActiveTab('RIDES')} label="Ride" />
           <MobileTab active={activeTab === 'LOGS'} onClick={() => setActiveTab('LOGS')} label="Logs" />
+          <MobileTab active={activeTab === 'JADUAL'} onClick={() => setActiveTab('JADUAL')} label="Jadual" />
           <MobileTab active={activeTab === 'SYSTEM'} onClick={() => setActiveTab('SYSTEM')} label="System" />
         </div>
 
@@ -433,6 +440,82 @@ export function AdminHome() {
                         ))
                       );
                     })()}
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {activeTab === 'JADUAL' && (
+              <motion.div key="jadual" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
+                {!selectedDriverId ? (
+                  <div className="space-y-6">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                      <div>
+                        <h2 className="text-2xl font-black">Jadual Pemandu</h2>
+                        <p className="text-sm font-bold text-[#431407]/40">Pilih pemandu untuk melihat jadual bulanan</p>
+                      </div>
+                      <div className="w-full md:w-64 relative group">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#431407]/20 group-focus-within:text-[#ea580c]" size={18} />
+                        <input
+                          placeholder="Cari pemandu..."
+                          value={timetableSearch}
+                          onChange={e => setTimetableSearch(e.target.value)}
+                          className="w-full pl-11 pr-4 py-3 bg-white border border-[#ea580c]/10 rounded-2xl font-bold outline-none focus:ring-1 focus:ring-[#ea580c] shadow-sm text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {users
+                        .filter(u => u.role === 'DRIVER' && (
+                          (u.name || '').toLowerCase().includes(timetableSearch.toLowerCase()) ||
+                          u.username.toLowerCase().includes(timetableSearch.toLowerCase())
+                        ))
+                        .sort((a, b) => (a.name || a.username).localeCompare(b.name || b.username))
+                        .map(driver => (
+                          <Card 
+                            key={driver.id} 
+                            onClick={() => setSelectedDriverId(driver.id)}
+                            className="!p-5 border border-[#ea580c]/5 hover:border-[#ea580c]/20 hover:shadow-md transition-all cursor-pointer group bg-white"
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 rounded-2xl bg-[#ea580c]/5 flex items-center justify-center text-[#ea580c] group-hover:bg-[#ea580c] group-hover:text-white transition-all">
+                                <UsersIcon size={24} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-black text-base">{driver.name || driver.username}</div>
+                                <div className="text-[10px] font-bold text-[#431407]/30 uppercase tracking-wider">@{driver.username}</div>
+                              </div>
+                              <ChevronRight size={18} className="text-[#ea580c]/20 group-hover:text-[#ea580c] transition-colors" />
+                            </div>
+                          </Card>
+                        ))
+                      }
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-4">
+                      <button 
+                        onClick={() => setSelectedDriverId(null)}
+                        className="p-3 bg-white border border-[#ea580c]/10 rounded-2xl text-[#ea580c] hover:bg-[#ea580c]/5 transition-all shadow-sm"
+                      >
+                        <ChevronLeft size={20} />
+                      </button>
+                      <div>
+                        <h2 className="text-2xl font-black">
+                          {users.find(u => u.id === selectedDriverId)?.name || users.find(u => u.id === selectedDriverId)?.username}
+                        </h2>
+                        <p className="text-sm font-bold text-[#431407]/40 uppercase tracking-widest">Jadual Perjalanan Bulanan</p>
+                      </div>
+                    </div>
+
+                    <MonthlyTimetable 
+                      driverId={selectedDriverId} 
+                      trips={trips} 
+                      currentMonth={currentMonth} 
+                      onMonthChange={setCurrentMonth} 
+                    />
                   </div>
                 )}
               </motion.div>
@@ -1296,3 +1379,103 @@ function EditTripModal({ trip, startStr, setStartStr, endStr, setEndStr, onClose
     </div>
   );
 }
+
+function MonthlyTimetable({ driverId, trips, currentMonth, onMonthChange }: { driverId: string, trips: Trip[], currentMonth: Date, onMonthChange: (d: Date) => void }) {
+  const monthStart = startOfMonth(currentMonth);
+  const monthEnd = endOfMonth(monthStart);
+  const startDate = startOfWeek(monthStart);
+  const endDate = endOfWeek(monthEnd);
+
+  const calendarDays = eachDayOfInterval({ start: startDate, end: endDate });
+  
+  const driverTrips = useMemo(() => trips.filter(t => t.driverId === driverId), [trips, driverId]);
+
+  const malayDays = ['Ahad', 'Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat', 'Sabtu'];
+
+  return (
+    <div className="bg-white rounded-[32px] border border-[#ea580c]/10 shadow-sm overflow-hidden">
+      {/* Calendar Header */}
+      <div className="p-6 border-b border-[#ea580c]/5 flex items-center justify-between bg-[#fffaf5]/50">
+        <div className="flex items-center gap-4">
+          <button onClick={() => onMonthChange(subMonths(currentMonth, 1))} className="p-2 hover:bg-[#ea580c]/5 rounded-xl text-[#ea580c] transition-all">
+            <ChevronLeft size={24} />
+          </button>
+          <h3 className="text-xl font-black text-[#431407] min-w-[150px] text-center capitalize">
+            {format(currentMonth, 'MMMM yyyy')}
+          </h3>
+          <button onClick={() => onMonthChange(addMonths(currentMonth, 1))} className="p-2 hover:bg-[#ea580c]/5 rounded-xl text-[#ea580c] transition-all">
+            <ChevronRight size={24} />
+          </button>
+        </div>
+        <button 
+          onClick={() => onMonthChange(new Date())}
+          className="px-4 py-2 bg-white border border-[#ea580c]/20 rounded-xl text-xs font-black text-[#ea580c] hover:bg-[#ea580c] hover:text-white transition-all shadow-sm"
+        >
+          Hari Ini
+        </button>
+      </div>
+
+      {/* Days of Week */}
+      <div className="grid grid-cols-7 border-b border-[#ea580c]/5 bg-[#fffaf5]/30">
+        {malayDays.map(day => (
+          <div key={day} className="py-3 text-center text-[10px] font-black uppercase text-[#ea580c]/40 tracking-widest border-r border-[#ea580c]/5 last:border-r-0">
+            {day}
+          </div>
+        ))}
+      </div>
+
+      {/* Calendar Grid */}
+      <div className="grid grid-cols-7">
+        {calendarDays.map((day, idx) => {
+          const isCurrentMonth = isSameMonth(day, monthStart);
+          const dayTrips = driverTrips.filter(t => isSameDay(new Date(t.startTime), day));
+          const isToday = isSameDay(day, new Date());
+
+          return (
+            <div 
+              key={day.toString()} 
+              className={`min-h-[140px] p-2 border-r border-b border-[#ea580c]/5 last:border-r-0 relative flex flex-col gap-1 transition-colors ${!isCurrentMonth ? 'bg-gray-50/50' : 'bg-white'} ${isToday ? 'bg-orange-50/30' : ''}`}
+            >
+              <div className="flex justify-between items-start mb-1">
+                <span className={`text-xs font-black ${!isCurrentMonth ? 'text-[#431407]/20' : isToday ? 'text-[#ea580c]' : 'text-[#431407]/40'}`}>
+                  {format(day, 'd')}
+                </span>
+                {isToday && <div className="w-1.5 h-1.5 rounded-full bg-[#ea580c] animate-pulse" />}
+              </div>
+
+              <div className="flex-1 space-y-1 overflow-y-auto no-scrollbar">
+                {dayTrips.length > 0 ? (
+                  dayTrips.map(trip => (
+                    <div key={trip.id} className="group relative">
+                      <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-1.5 text-[10px] leading-tight">
+                        <div className="flex items-center gap-1 font-black text-emerald-700">
+                          <ArrowUp size={8} /> {format(trip.startTime, 'hh:mm a')} <span className="opacity-40">IN</span>
+                        </div>
+                        {trip.endTime && (
+                          <div className="flex items-center gap-1 font-black text-blue-600 mt-0.5">
+                            <ArrowDown size={8} /> {format(trip.endTime, 'hh:mm a')} <span className="opacity-40">OUT</span>
+                          </div>
+                        )}
+                        <div className="mt-1 text-[8px] font-bold text-emerald-900/40 truncate">
+                          {trip.plateNumber} • {trip.origin}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : isCurrentMonth ? (
+                  <div className="h-full flex flex-col items-center justify-center py-4 opacity-40">
+                    <div className="text-red-500/60 mb-1">
+                      <X size={14} strokeWidth={3} />
+                    </div>
+                    <span className="text-[8px] font-black uppercase text-red-500/60 tracking-tighter text-center">Tiada Pemanduan</span>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
