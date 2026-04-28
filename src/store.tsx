@@ -301,12 +301,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await deleteDoc(doc(db, 'rides', ride.id));
     }
 
-    // 3. Cleanup Trips (Logs) that are COMPLETED and older than 48 hours
-    const twoDaysAgo = Date.now() - (48 * 60 * 60 * 1000);
-    const oldTrips = state.trips.filter(t => t.status === 'COMPLETED' && t.endTime && t.endTime < twoDaysAgo);
-    for (const trip of oldTrips) {
-      await deleteDoc(doc(db, 'trips', trip.id));
-    }
   };
 
   return (
