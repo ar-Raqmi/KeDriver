@@ -170,8 +170,7 @@ export function AdminHome() {
   const [editTripEndStr, setEditTripEndStr] = useState('');
   
   // JADUAL (TIMETABLE) STATE
-  const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [timetableSearch, setTimetableSearch] = useState('');
 
 
@@ -447,79 +446,17 @@ export function AdminHome() {
 
             {activeTab === 'JADUAL' && (
               <motion.div key="jadual" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6 pb-20">
-                {!selectedDriverId ? (
-                  <div className="space-y-6">
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                      <div>
-                        <h2 className="text-2xl font-black">Jadual Pemandu</h2>
-                        <p className="text-sm font-bold text-[#431407]/40">Pilih pemandu untuk melihat jadual bulanan</p>
-                      </div>
-                      <div className="w-full md:w-64 relative group">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#431407]/20 group-focus-within:text-[#ea580c]" size={18} />
-                        <input
-                          placeholder="Cari pemandu..."
-                          value={timetableSearch}
-                          onChange={e => setTimetableSearch(e.target.value)}
-                          className="w-full pl-11 pr-4 py-3 bg-white border border-[#ea580c]/10 rounded-2xl font-bold outline-none focus:ring-1 focus:ring-[#ea580c] shadow-sm text-sm"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {users
-                        .filter(u => u.role === 'DRIVER' && (
-                          (u.name || '').toLowerCase().includes(timetableSearch.toLowerCase()) ||
-                          u.username.toLowerCase().includes(timetableSearch.toLowerCase())
-                        ))
-                        .sort((a, b) => (a.name || a.username).localeCompare(b.name || b.username))
-                        .map(driver => (
-                          <Card 
-                            key={driver.id} 
-                            onClick={() => setSelectedDriverId(driver.id)}
-                            className="!p-5 border border-[#ea580c]/5 hover:border-[#ea580c]/20 hover:shadow-md transition-all cursor-pointer group bg-white"
-                          >
-                            <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 rounded-2xl bg-[#ea580c]/5 flex items-center justify-center text-[#ea580c] group-hover:bg-[#ea580c] group-hover:text-white transition-all">
-                                <UsersIcon size={24} />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="font-black text-base">{driver.name || driver.username}</div>
-                                <div className="text-[10px] font-bold text-[#431407]/30 uppercase tracking-wider">@{driver.username}</div>
-                              </div>
-                              <ChevronRight size={18} className="text-[#ea580c]/20 group-hover:text-[#ea580c] transition-colors" />
-                            </div>
-                          </Card>
-                        ))
-                      }
-                    </div>
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                  <div>
+                    <h2 className="text-2xl font-black">Jadual Pemandu</h2>
+                    <p className="text-sm font-bold text-[#431407]/40">Paparan jadual mingguan</p>
                   </div>
-                ) : (
-                  <div className="space-y-8">
-                    <div className="flex items-start gap-5">
-                      <button 
-                        onClick={() => setSelectedDriverId(null)}
-                        className="mt-1 p-4 bg-white border border-[#ea580c]/5 rounded-[20px] text-[#ea580c] hover:bg-[#ea580c]/5 transition-all shadow-sm"
-                      >
-                        <ChevronLeft size={24} />
-                      </button>
-                      <div className="flex-1">
-                        <h2 className="text-3xl font-black text-[#431407] leading-tight max-w-[300px]">
-                          {users.find(u => u.id === selectedDriverId)?.name || users.find(u => u.id === selectedDriverId)?.username}
-                        </h2>
-                        <p className="text-[11px] font-black text-[#431407]/30 uppercase tracking-[0.2em] mt-2">Jadual Perjalanan Bulanan</p>
-                      </div>
-                    </div>
-
-                    <div className="bg-white rounded-[40px] shadow-sm border border-[#ea580c]/10 overflow-hidden">
-                      <MonthlyTimetable 
-                        driverId={selectedDriverId} 
-                        trips={trips} 
-                        currentMonth={currentMonth} 
-                        onMonthChange={setCurrentMonth} 
-                      />
-                    </div>
-                  </div>
-                )}
+                </div>
+                <WeeklyDriverTable 
+                  trips={trips} 
+                  currentWeekStart={currentWeekStart} 
+                  onWeekChange={setCurrentWeekStart} 
+                />
               </motion.div>
             )}
 
@@ -1382,191 +1319,83 @@ function EditTripModal({ trip, startStr, setStartStr, endStr, setEndStr, onClose
   );
 }
 
-function MonthlyTimetable({ driverId, trips, currentMonth, onMonthChange }: { driverId: string, trips: Trip[], currentMonth: Date, onMonthChange: (d: Date) => void }) {
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  const monthStart = startOfMonth(currentMonth);
-  const monthEnd = endOfMonth(monthStart);
+function WeeklyDriverTable({ trips, currentWeekStart, onWeekChange }: { trips: Trip[], currentWeekStart: Date, onWeekChange: (d: Date) => void }) {
+  const { users } = useAppStore();
+  const drivers = useMemo(() => users.filter(u => u.role === 'DRIVER').sort((a, b) => (a.name || a.username).localeCompare(b.name || b.username)), [users]);
   
-  // On mobile, we show one week. On desktop, the whole month.
-  const startDate = isMobile ? startOfWeek(currentMonth) : startOfWeek(monthStart);
-  const endDate = isMobile ? endOfWeek(currentMonth) : endOfWeek(monthEnd);
-
-  const calendarDays = eachDayOfInterval({ start: startDate, end: endDate });
-  const driverTrips = useMemo(() => trips.filter(t => t.driverId === driverId), [trips, driverId]);
-  const malayDays = ['Ahad', 'Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat', 'Sabtu'];
-
-  const handlePrev = () => {
-    onMonthChange(isMobile ? subWeeks(currentMonth, 1) : subMonths(currentMonth, 1));
-  };
-
-  const handleNext = () => {
-    onMonthChange(isMobile ? addWeeks(currentMonth, 1) : addMonths(currentMonth, 1));
+  const weekDays = useMemo(() => {
+    const start = startOfWeek(currentWeekStart, { weekStartsOn: 1 });
+    const end = endOfWeek(start, { weekStartsOn: 1 });
+    return eachDayOfInterval({ start, end });
+  }, [currentWeekStart]);
+  
+  const getTripsForDriverAndDay = (driverId: string, day: Date) => {
+    return trips.filter(t => t.driverId === driverId && isSameDay(new Date(t.startTime), day));
   };
 
   return (
-    <div className="bg-white">
-      {/* Calendar Header */}
-      <div className="p-6 md:p-8 pb-4 flex items-center justify-between">
-        <div className="flex items-center gap-4 md:gap-6">
-          <button onClick={handlePrev} className="p-1 text-[#ea580c] hover:opacity-60 transition-all">
-            <ChevronLeft size={isMobile ? 24 : 28} strokeWidth={3} />
-          </button>
-          <div className="text-center min-w-[120px] md:min-w-[140px]">
-            <h3 className="text-lg md:text-2xl font-black text-[#431407] capitalize tracking-tight">
-              {format(currentMonth, 'MMMM yyyy')}
-            </h3>
-            {isMobile && (
-              <p className="text-[10px] font-black text-[#ea580c] uppercase tracking-widest mt-0.5">
-                {format(startDate, 'dd/MM')} — {format(endDate, 'dd/MM')}
-              </p>
-            )}
-          </div>
-          <button onClick={handleNext} className="p-1 text-[#ea580c] hover:opacity-60 transition-all">
-            <ChevronRight size={isMobile ? 24 : 28} strokeWidth={3} />
-          </button>
+    <div className="bg-white rounded-[20px] shadow-sm border border-[#ea580c]/10">
+      {/* Week Navigation */}
+      <div className="p-4 border-b border-[#ea580c]/5 flex items-center justify-between">
+        <button onClick={() => onWeekChange(subWeeks(currentWeekStart, 1))} className="p-2 text-[#ea580c]"><ChevronLeft /></button>
+        <div className="font-black text-sm text-[#431407]">
+          {weekDays.map(d => d).length >= 7 ? (
+            <>
+              {format(weekDays[0], 'dd MMM')} - {format(weekDays[6], 'dd MMM yyyy')}
+            </>
+          ) : 'Invalid Week'}
         </div>
-        <button 
-          onClick={() => onMonthChange(new Date())}
-          className="px-4 py-2 md:px-6 md:py-3 bg-white border border-[#ea580c]/10 rounded-[14px] md:rounded-[18px] text-[10px] md:text-xs font-black text-[#ea580c] hover:bg-[#ea580c]/5 transition-all shadow-sm"
-        >
-          Hari Ini
-        </button>
+        <button onClick={() => onWeekChange(addWeeks(currentWeekStart, 1))} className="p-2 text-[#ea580c]"><ChevronRight /></button>
       </div>
 
-      <div className={`${isMobile ? '' : 'overflow-x-auto no-scrollbar scroll-smooth'}`}>
-        <div className={`${isMobile ? 'p-4 space-y-3' : 'min-w-[800px] md:min-w-0'}`}>
-          {!isMobile && (
-            <div className="grid grid-cols-7 border-b border-[#ea580c]/5">
-              {malayDays.map(day => (
-                <div key={day} className="py-6 text-center text-[10px] font-black uppercase text-[#ea580c]/30 tracking-[0.2em] border-r border-[#ea580c]/5 last:border-r-0">
-                  {day}
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className={isMobile ? 'space-y-4' : 'grid grid-cols-7'}>
-            {calendarDays.map((day) => {
-              const isCurrentMonth = isSameMonth(day, monthStart);
-              const dayTrips = driverTrips.filter(t => isSameDay(new Date(t.startTime), day));
-              const isToday = isSameDay(day, new Date());
-
-              if (isMobile) {
+      {/* Table */}
+      <div className="overflow-x-auto">
+        <table className="w-full table-fixed border-collapse">
+          <thead>
+            <tr>
+              <th className="w-48 p-3 text-[10px] font-black uppercase text-[#ea580c]/60 border-b border-[#ea580c]/10 bg-gray-50/50">Pemandu</th>
+              {weekDays.map(day => {
+                const isValidDay = day instanceof Date && !isNaN(day.getTime());
                 return (
-                  <div 
-                    key={day.toString()} 
-                    className={`p-4 rounded-[28px] border transition-all ${isToday ? 'bg-orange-50/40 border-[#ea580c]/20 shadow-sm' : 'bg-white border-[#ea580c]/5'}`}
-                  >
-                    <div className="flex justify-between items-center mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-2xl flex flex-col items-center justify-center font-black ${isToday ? 'bg-[#ea580c] text-white' : 'bg-[#fffaf5] text-[#431407]/40'}`}>
-                          <span className="text-[10px] leading-none uppercase">{format(day, 'EEE')}</span>
-                          <span className="text-sm leading-none mt-1">{format(day, 'd')}</span>
-                        </div>
-                        <div>
-                          <div className="font-black text-[#431407]">{malayDays[day.getDay()]}</div>
-                          <div className="text-[10px] font-bold text-[#431407]/30">{format(day, 'dd MMMM yyyy')}</div>
-                        </div>
-                      </div>
-                      {dayTrips.length > 0 && (
-                        <div className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider">
-                          {dayTrips.length} Sesi
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      {dayTrips.length > 0 ? (
-                        dayTrips.map(trip => (
-                          <div key={trip.id} className="bg-[#fffaf5] border border-[#ea580c]/5 rounded-[20px] p-4 flex items-center justify-between">
-                            <div className="flex gap-4">
-                              <div className="flex flex-col gap-1 border-r border-[#ea580c]/10 pr-4">
-                                <div className="text-xs font-black text-emerald-600 flex items-center gap-1">
-                                  <ArrowUp size={12} /> {format(trip.startTime, 'hh:mm a')}
-                                </div>
-                                {trip.endTime && (
-                                  <div className="text-xs font-black text-blue-600 flex items-center gap-1">
-                                    <ArrowDown size={12} /> {format(trip.endTime, 'hh:mm a')}
-                                  </div>
-                                )}
-                              </div>
-                              <div className="flex flex-col justify-center">
-                                <div className="text-[10px] font-black uppercase text-[#ea580c]">{trip.plateNumber}</div>
-                                <div className="text-xs font-bold text-[#431407]/60 truncate max-w-[120px]">{trip.origin}</div>
-                              </div>
-                            </div>
-                            <div className="p-2 bg-white rounded-xl text-[#ea580c]/20">
-                              <ChevronRight size={16} />
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="flex items-center gap-3 py-2 px-4 opacity-20">
-                          <X size={16} strokeWidth={3} className="text-red-500" />
-                          <span className="text-xs font-black uppercase tracking-widest text-red-500">Tiada Pemanduan</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <th key={day.toString()} className="w-32 p-3 text-[10px] font-black uppercase text-[#ea580c]/60 border-b border-[#ea580c]/10 text-center bg-gray-50/50">
+                    {isValidDay ? `${format(day, 'EEE')} \n ${format(day, 'dd')}` : 'N/A'}
+                  </th>
                 );
-              }
-
-              // DESKTOP GRID (unchanged logic, just wrapped)
-              return (
-                <div 
-                  key={day.toString()} 
-                  className={`min-h-[220px] p-3 border-r border-b border-[#ea580c]/5 last:border-r-0 relative flex flex-col gap-2 transition-colors ${!isCurrentMonth ? 'bg-gray-50/30' : 'bg-white'} ${isToday ? 'bg-orange-50/20' : ''}`}
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <span className={`text-[13px] font-black ${!isCurrentMonth ? 'text-[#431407]/10' : isToday ? 'text-[#ea580c]' : 'text-[#431407]/20'}`}>
-                      {format(day, 'd')}
-                    </span>
-                    {isToday && <div className="w-1.5 h-1.5 rounded-full bg-[#ea580c]" />}
-                  </div>
-
-                  <div className="flex-1 space-y-2 overflow-y-auto no-scrollbar">
-                    {dayTrips.length > 0 ? (
-                      dayTrips.map(trip => (
-                        <div key={trip.id} className="bg-emerald-50/60 border border-emerald-100 rounded-[14px] p-2 text-[10px] leading-tight">
-                          <div className="flex flex-col font-black text-emerald-700 gap-0.5">
-                            <div className="flex items-center justify-between">
-                              <span>{format(trip.startTime, 'hh:mm')}</span>
-                              <span className="text-[8px] opacity-40">AM</span>
-                            </div>
-                            {trip.endTime && (
-                              <div className="flex items-center justify-between text-blue-600 border-t border-emerald-100 mt-1 pt-1">
-                                <span>{format(trip.endTime, 'hh:mm')}</span>
-                                <span className="text-[8px] opacity-40">PM</span>
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {drivers.map((driver, index) => (
+              <tr key={driver.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-[#fffaf5]'} border-b border-[#ea580c]/10 hover:bg-orange-50/30`}>
+                <td className={`p-3 font-bold text-xs text-[#431407] whitespace-normal break-words border-r border-[#ea580c]/10 ${index % 2 === 0 ? 'bg-white' : 'bg-[#fffaf5]'}`}>
+                  {driver.name || driver.username}
+                </td>
+                {weekDays.map(day => {
+                  const dayTrips = getTripsForDriverAndDay(driver.id, day);
+                  return (
+                    <td key={day.toString()} className="p-2 border-l border-[#ea580c]/5 align-top">
+                      {dayTrips.length > 0 ? (
+                        <div className="flex flex-col gap-1">
+                          {dayTrips.map(trip => {
+                            const startTime = new Date(trip.startTime);
+                            const isValid = !isNaN(startTime.getTime());
+                            return (
+                              <div key={trip.id} className="text-[9px] font-black bg-[#ea580c]/10 text-[#ea580c] p-1.5 rounded-md border border-[#ea580c]/20 text-center">
+                                {isValid ? format(startTime, 'HH:mm') : 'N/A'}
                               </div>
-                            )}
-                          </div>
-                          <div className="mt-1.5 text-[8px] font-bold text-emerald-900/30 truncate">
-                            {trip.plateNumber}
-                          </div>
+                            );
+                          })}
                         </div>
-                      ))
-                    ) : isCurrentMonth ? (
-                      <div className="h-full flex flex-col items-center justify-center py-6 opacity-30">
-                        <div className="text-red-400 mb-1.5">
-                          <X size={16} strokeWidth={3} />
-                        </div>
-                        <span className="text-[9px] font-black uppercase text-red-400 tracking-tighter text-center leading-tight">Tiada<br/>Mandu</span>
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+                      ) : (
+                        <div className="text-[9px] text-[#431407]/30 italic text-center p-1.5 bg-gray-100/50 rounded-md">Tiada Pemanduan</div>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
