@@ -319,7 +319,7 @@ export function AdminHome() {
   };
 
   return (
-    <div className="flex flex-col md:flex-row bg-[#fff7ed] min-h-[100dvh] max-w-7xl mx-auto overflow-hidden text-[#431407]">
+    <div className="flex flex-col md:flex-row bg-[#fff7ed] min-h-[100dvh] overflow-hidden text-[#431407]">
       {/* Sidebar - Desktop */}
       <aside className={`bg-white border-r border-[#ea580c]/10 hidden md:flex flex-col h-screen shrink-0 transition-all duration-300 ${isSidebarCollapsed ? 'w-20' : 'w-64'}`}>
         <div className="p-8">
