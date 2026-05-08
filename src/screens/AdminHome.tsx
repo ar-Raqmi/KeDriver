@@ -462,11 +462,21 @@ export function AdminHome() {
                     <h2 className="text-2xl font-black">Jadual Pemandu</h2>
                     <p className="text-sm font-bold text-[#431407]/40">Paparan jadual mingguan</p>
                   </div>
+                  <div className="relative w-full md:w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#431407]/20" size={16} />
+                    <input
+                      placeholder="Cari pemandu..."
+                      value={timetableSearch}
+                      onChange={e => setTimetableSearch(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#ea580c]/10 rounded-2xl font-bold text-sm outline-none ring-[#ea580c] focus:ring-1 transition-all shadow-sm"
+                    />
+                  </div>
                 </div>
                 <WeeklyDriverTable 
                   trips={trips} 
                   currentWeekStart={currentWeekStart} 
                   onWeekChange={setCurrentWeekStart} 
+                  searchQuery={timetableSearch}
                 />
               </motion.div>
             )}
@@ -1335,9 +1345,12 @@ function EditTripModal({ trip, startStr, setStartStr, endStr, setEndStr, onClose
   );
 }
 
-function WeeklyDriverTable({ trips, currentWeekStart, onWeekChange }: { trips: Trip[], currentWeekStart: Date, onWeekChange: (d: Date) => void }) {
+function WeeklyDriverTable({ trips, currentWeekStart, onWeekChange, searchQuery }: { trips: Trip[], currentWeekStart: Date, onWeekChange: (d: Date) => void, searchQuery: string }) {
   const { users } = useAppStore();
-  const drivers = useMemo(() => users.filter(u => u.role === 'DRIVER').sort((a, b) => (a.name || a.username).localeCompare(b.name || b.username)), [users]);
+  const drivers = useMemo(() => users.filter(u => u.role === 'DRIVER').filter(u => {
+    const name = (u.name || u.username).toLowerCase();
+    return name.includes(searchQuery.toLowerCase());
+  }).sort((a, b) => (a.name || a.username).localeCompare(b.name || b.username)), [users, searchQuery]);
   
   const weekDays = useMemo(() => {
     const start = startOfWeek(currentWeekStart, { weekStartsOn: 1 });
