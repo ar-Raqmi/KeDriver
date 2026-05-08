@@ -168,6 +168,7 @@ export function AdminHome() {
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
   const [editTripStartStr, setEditTripStartStr] = useState('');
   const [editTripEndStr, setEditTripEndStr] = useState('');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   
   // JADUAL (TIMETABLE) STATE
   const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
@@ -320,35 +321,45 @@ export function AdminHome() {
   return (
     <div className="flex flex-col md:flex-row bg-[#fff7ed] min-h-[100dvh] max-w-7xl mx-auto overflow-hidden text-[#431407]">
       {/* Sidebar - Desktop */}
-      <aside className="w-64 bg-white border-r border-[#ea580c]/10 hidden md:flex flex-col h-screen shrink-0">
+      <aside className={`bg-white border-r border-[#ea580c]/10 hidden md:flex flex-col h-screen shrink-0 transition-all duration-300 ${isSidebarCollapsed ? 'w-20' : 'w-64'}`}>
         <div className="p-8">
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex justify-end mb-4">
+            <button
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              className="text-[#431407]/40 hover:text-[#ea580c] transition-colors"
+            >
+              {isSidebarCollapsed ? <ChevronRight size={24} /> : <ChevronLeft size={24} />}
+            </button>
+          </div>
+          <div className={`flex items-center gap-3 mb-2 ${isSidebarCollapsed ? 'justify-center' : ''}`}>
             <div className="bg-[#ea580c] p-2 rounded-2xl text-white">
               <Truck size={24} />
             </div>
-            <h1 className="text-2xl font-black text-[#ea580c]">KeDriver</h1>
+            {!isSidebarCollapsed && <h1 className="text-2xl font-black text-[#ea580c]">KeDriver</h1>}
           </div>
-          <p className="text-[10px] font-bold text-[#431407]/40 uppercase tracking-widest pl-1">Admin Panel</p>
+          {!isSidebarCollapsed && <p className="text-[10px] font-bold text-[#431407]/40 uppercase tracking-widest pl-1">Admin Panel</p>}
         </div>
 
         <nav className="flex-1 px-4 space-y-2">
-          <SidebarButton active={activeTab === 'RIDES'} onClick={() => setActiveTab('RIDES')} icon={<Calendar size={20} />} label="Permohonan" />
-          <SidebarButton active={activeTab === 'LOGS'} onClick={() => setActiveTab('LOGS')} icon={<FileText size={20} />} label="Log Perjalanan" />
-          <SidebarButton active={activeTab === 'JADUAL'} onClick={() => setActiveTab('JADUAL')} icon={<Clock size={20} />} label="Jadual Pemandu" />
-          <SidebarButton active={activeTab === 'SYSTEM'} onClick={() => setActiveTab('SYSTEM')} icon={<Settings size={20} />} label="Pengurusan Sistem" />
+          <SidebarButton active={activeTab === 'RIDES'} onClick={() => setActiveTab('RIDES')} icon={<Calendar size={20} />} label="Permohonan" collapsed={isSidebarCollapsed} />
+          <SidebarButton active={activeTab === 'LOGS'} onClick={() => setActiveTab('LOGS')} icon={<FileText size={20} />} label="Log Perjalanan" collapsed={isSidebarCollapsed} />
+          <SidebarButton active={activeTab === 'JADUAL'} onClick={() => setActiveTab('JADUAL')} icon={<Clock size={20} />} label="Jadual Pemandu" collapsed={isSidebarCollapsed} />
+          <SidebarButton active={activeTab === 'SYSTEM'} onClick={() => setActiveTab('SYSTEM')} icon={<Settings size={20} />} label="Pengurusan Sistem" collapsed={isSidebarCollapsed} />
         </nav>
 
         <div className="p-6 border-t border-[#ea580c]/10">
-          <div className="flex flex-col gap-1 mb-6 px-2">
-            <div className="font-black text-sm text-[#431407] leading-tight">
-              {currentUser?.name || currentUser?.username}
+          {!isSidebarCollapsed && (
+            <div className="flex flex-col gap-1 mb-6 px-2">
+              <div className="font-black text-sm text-[#431407] leading-tight">
+                {currentUser?.name || currentUser?.username}
+              </div>
+              <div className="text-[10px] font-black text-[#ea580c] uppercase tracking-wider">
+                Admin
+              </div>
             </div>
-            <div className="text-[10px] font-black text-[#ea580c] uppercase tracking-wider">
-              Admin
-            </div>
-          </div>
-          <Button variant="tonal" className="w-full text-xs font-bold py-3" onClick={logout}>
-            <LogOut size={16} /> Log Keluar
+          )}
+          <Button variant="tonal" className={`w-full text-xs font-bold py-3 ${isSidebarCollapsed ? 'px-0 justify-center' : ''}`} onClick={logout}>
+            <LogOut size={16} /> {!isSidebarCollapsed && 'Log Keluar'}
           </Button>
         </div>
       </aside>
@@ -808,13 +819,14 @@ export function AdminHome() {
 }
 
 // HELPER COMPONENTS
-function SidebarButton({ active, onClick, icon, label }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string }) {
+function SidebarButton({ active, onClick, icon, label, collapsed }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string, collapsed: boolean }) {
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-bold text-sm ${active ? 'bg-[#ea580c] text-white shadow-lg shadow-[#ea580c]/20' : 'text-[#431407]/60 hover:bg-[#ffedd5] hover:text-[#ea580c]'}`}
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-bold text-sm ${active ? 'bg-[#ea580c] text-white shadow-lg shadow-[#ea580c]/20' : 'text-[#431407]/60 hover:bg-[#ffedd5] hover:text-[#ea580c]'} ${collapsed ? 'justify-center' : ''}`}
+      title={collapsed ? label : undefined}
     >
-      {icon} {label}
+      {icon} {!collapsed && label}
     </button>
   );
 }
