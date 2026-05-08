@@ -9,7 +9,7 @@ export interface User {
   createdAt?: number;
 }
 
-export type TimePreference = 'Pagi' | 'Petang';
+export type TimePreference = string;
 export type RequestStatus = 'PENDING' | 'SCHEDULED' | 'REJECTED' | 'EXPIRED' | 'COMPLETED';
 
 export interface RideRequest {

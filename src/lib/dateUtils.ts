@@ -79,3 +79,10 @@ export function formatToDateTime(timestamp: number): string {
   
   return `${dd}/${mm}/${yyyy} ${String(hour).padStart(2, '0')}:${min} ${ampm}`;
 }
+
+export function getTimeCategory(timeStr: string): 'Pagi' | 'Petang' | 'Malam' {
+  const hour = parseInt(timeStr.split(':')[0], 10);
+  if (hour < 13) return 'Pagi'; // Before 1:00 PM
+  if (hour < 19) return 'Petang'; // 1:00 PM - 6:59 PM
+  return 'Malam'; // 7:00 PM and after
+}

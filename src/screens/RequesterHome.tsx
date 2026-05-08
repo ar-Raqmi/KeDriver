@@ -3,7 +3,7 @@ import { useAppStore } from '../store';
 import { Button, Input, DateInput, Card, Badge, Plate } from '../components/ui';
 import { LogOut, Plus, MapPin, X, Calendar, Clock, Info, Truck, Pencil, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { formatTo12Hour, formatToDDMMYYYY, getGroupHeader } from '../lib/dateUtils';
+import { formatTo12Hour, formatToDDMMYYYY, getGroupHeader, getTimeCategory } from '../lib/dateUtils';
 import { TimePreference } from '../types';
 
 export function RequesterHome() {
@@ -14,7 +14,7 @@ export function RequesterHome() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [destinations, setDestinations] = useState<string[]>(['']);
   const [date, setDate] = useState('');
-  const [timePref, setTimePref] = useState<TimePreference>('Pagi');
+  const [timePref, setTimePref] = useState<string>('08:00');
   const [note, setNote] = useState('');
 
   const submit = async (e: React.FormEvent) => {
@@ -46,14 +46,39 @@ export function RequesterHome() {
     setDestinations(['']);
     setDate('');
     setNote('');
-    setTimePref('Pagi');
+    setHour(8);
+    setMinute(0);
+    setAmpm('AM');
+    setTimePref('08:00');
     setEditingId(null);
+  };
+
+  // Time State
+  const [hour, setHour] = useState(8);
+  const [minute, setMinute] = useState(0);
+  const [ampm, setAmpm] = useState<'AM' | 'PM'>('AM');
+
+  // Update timePref when form inputs change
+  const updateTimePref = (h: number, m: number, a: 'AM' | 'PM') => {
+    let hh = h;
+    if (a === 'PM' && hh < 12) hh += 12;
+    if (a === 'AM' && hh === 12) hh = 0;
+    setTimePref(`${String(hh).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
   };
 
   const handleEdit = (req: any) => {
     setEditingId(req.id);
     setDestinations(req.destinations);
     setDate(req.date);
+    
+    // Parse timePref for form
+    const [h24, m] = req.timePreference.split(':').map(Number);
+    const a = h24 >= 12 ? 'PM' : 'AM';
+    const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+    setHour(h12);
+    setMinute(m);
+    setAmpm(a);
+    
     setTimePref(req.timePreference);
     setNote(req.note || '');
     setTab('NEW');
@@ -147,12 +172,30 @@ export function RequesterHome() {
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-[#ea580c] ml-1 flex items-center gap-2 mb-2"><Clock size={16} /> Keutamaan Masa</label>
-                  <div className="flex bg-[#fffaf5] p-1.5 rounded-2xl border border-orange-100">
-                    {(['Pagi', 'Petang'] as TimePreference[]).map(t => (
-                      <button key={t} type="button" onClick={() => setTimePref(t)} className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${timePref === t ? 'bg-[#ea580c] text-white shadow-md' : 'text-[#9a3412] opacity-60'}`}>
-                        {t}
-                      </button>
-                    ))}
+                  <div className="flex gap-2">
+                    <select
+                      value={hour}
+                      onChange={e => { const h = parseInt(e.target.value); setHour(h); updateTimePref(h, minute, ampm); }}
+                      className="flex-1 rounded-[24px] border border-transparent bg-[#fffaf5] px-[12px] py-[12px] text-base focus:outline-none focus:ring-1 focus:ring-[#ea580c] text-[#431407] font-medium"
+                    >
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map(h => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                    <select
+                      value={minute}
+                      onChange={e => { const m = parseInt(e.target.value); setMinute(m); updateTimePref(hour, m, ampm); }}
+                      className="flex-1 rounded-[24px] border border-transparent bg-[#fffaf5] px-[12px] py-[12px] text-base focus:outline-none focus:ring-1 focus:ring-[#ea580c] text-[#431407] font-medium"
+                    >
+                      <option value={0}>00</option>
+                      <option value={30}>30</option>
+                    </select>
+                    <select
+                      value={ampm}
+                      onChange={e => { const a = e.target.value as 'AM' | 'PM'; setAmpm(a); updateTimePref(hour, minute, a); }}
+                      className="flex-1 rounded-[24px] border border-transparent bg-[#fffaf5] px-[12px] py-[12px] text-base focus:outline-none focus:ring-1 focus:ring-[#ea580c] text-[#431407] font-medium"
+                    >
+                      <option value="AM">AM</option>
+                      <option value="PM">PM</option>
+                    </select>
                   </div>
                 </div>
 
@@ -212,8 +255,12 @@ export function RequesterHome() {
                         <div className="flex justify-between items-start mb-4">
                           <div className="flex flex-wrap items-center gap-2">
                             <Badge status={req.status}>{req.status}</Badge>
-                            <div className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg block w-fit ${(req.timePreference === 'Pagi' || req.timePreference === 'Day') ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-indigo-100 text-indigo-700 border border-indigo-200'}`}>
-                              {req.timePreference}
+                            <div className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg block w-fit ${
+                              getTimeCategory(req.timePreference) === 'Pagi' ? 'bg-amber-100 text-amber-700 border border-amber-200' :
+                              getTimeCategory(req.timePreference) === 'Petang' ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' :
+                              'bg-purple-100 text-purple-700 border border-purple-200'
+                            }`}>
+                              {formatTo12Hour(req.timePreference)}
                             </div>
                           </div>
                           {['PENDING', 'COMPLETED', 'REJECTED'].includes(req.status) && (

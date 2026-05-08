@@ -7,7 +7,7 @@ import {
   Truck, ArrowUp, ArrowDown, Edit2, FileText, UserPlus, Car
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { formatTo12Hour, formatToDDMMYYYY, getDayOfWeek, formatToDateTime, getGroupHeader, getTodayStrGMT8 } from '../lib/dateUtils';
+import { formatTo12Hour, formatToDDMMYYYY, getDayOfWeek, formatToDateTime, getGroupHeader, getTodayStrGMT8, getTimeCategory } from '../lib/dateUtils';
 import { User, Vehicle, Trip, UserRole } from '../types';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, addWeeks, subWeeks } from 'date-fns';
 import jsPDF from 'jspdf';
@@ -874,9 +874,13 @@ function PendingCard({ req, isSelected, onToggle }: { req: any, isSelected: bool
             <div>
               <div className="font-black text-lg text-[#431407]">{req.requesterName || req.requesterUsername}</div>
               <div className="flex items-center gap-2 mt-1.5 overflow-hidden">
-                <div className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border ${(req.timePreference === 'Pagi' || req.timePreference === 'Day') ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-indigo-50 text-indigo-600 border-indigo-100'}`}>
-                  {req.timePreference}
-                </div>
+                  <div className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border ${
+                    getTimeCategory(req.timePreference) === 'Pagi' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                    getTimeCategory(req.timePreference) === 'Petang' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' :
+                    'bg-purple-50 text-purple-600 border-purple-100'
+                  }`}>
+                    {formatTo12Hour(req.timePreference)}
+                  </div>
                 <div className="text-[10px] font-bold opacity-30">•</div>
                 <div className="text-[10px] font-bold opacity-40 uppercase tracking-widest">{formatToDDMMYYYY(req.date)}</div>
               </div>
