@@ -91,7 +91,9 @@ export function RequesterHome() {
   };
 
   const myRequests = requests.filter(r => r.requesterId === currentUser?.id).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const allScheduledRequests = requests.filter(r => r.status === 'SCHEDULED' && r.requesterId !== currentUser?.id).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'SCHEDULED' | 'REJECTED' | 'PAST'>('ALL');
+  const [showGlobal, setShowGlobal] = useState(false);
 
   const filteredRequests = myRequests.filter(req => {
     if (statusFilter === 'ALL') return true;
@@ -101,6 +103,84 @@ export function RequesterHome() {
     if (statusFilter === 'PAST') return ['COMPLETED', 'EXPIRED', 'CANCELLED'].includes(req.status);
     return true;
   });
+
+  const renderRequestCard = (req: any, isMine: boolean = true) => (
+    <Card key={req.id} className={`relative !p-[20px] border-none shadow-sm overflow-visible ${!isMine ? 'bg-slate-50 border border-slate-100' : ''}`}>
+      <div className="flex justify-between items-start mb-4">
+        <div className="flex flex-wrap items-center gap-2">
+          {isMine && <Badge status={req.status}>{req.status}</Badge>}
+          {!isMine && (
+            <div className="text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg bg-slate-200 text-slate-600">
+              {req.requesterName || 'Pegawai'}
+            </div>
+          )}
+          <div className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg block w-fit ${
+            getTimeCategory(req.timePreference) === 'Pagi' ? 'bg-amber-100 text-amber-700 border border-amber-200' :
+            getTimeCategory(req.timePreference) === 'Petang' ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' :
+            'bg-purple-100 text-purple-700 border border-purple-200'
+          }`}>
+            {formatTo12Hour(req.timePreference)}
+          </div>
+        </div>
+        {isMine && ['PENDING', 'COMPLETED', 'REJECTED'].includes(req.status) && (
+          <div className="flex items-center gap-2">
+            {req.status === 'PENDING' && (
+              <button onClick={() => handleEdit(req)} className="p-2 text-amber-600 bg-amber-50 rounded-xl hover:bg-amber-100 transition-colors">
+                <Pencil size={16} />
+              </button>
+            )}
+            <button onClick={() => handleDelete(req.id)} className="p-2 text-rose-600 bg-rose-50 rounded-xl hover:bg-rose-100 transition-colors">
+              <Trash2 size={16} />
+            </button>
+          </div>
+        )}
+      </div>
+      <div className="space-y-2">
+        {(() => {
+          if (req.status === 'SCHEDULED') {
+            const ride = rides.find(r => r.requestIds.includes(req.id));
+            if (ride) {
+              return ride.acceptedDestinations.map((d, i) => {
+                const isDestMine = isMine && req.destinations.includes(d);
+                return (
+                  <div key={i} className={`flex items-center gap-[12px] p-[10px] rounded-[16px] border ${isDestMine ? 'bg-[#ea580c]/5 border-[#ea580c] shadow-sm' : 'bg-gray-50 border-transparent opacity-60'}`}>
+                    <MapPin size={14} className={isDestMine ? "text-[#ea580c]" : "text-gray-400"} />
+                    <span className={`font-bold text-[13px] ${isDestMine ? 'text-[#431407]' : 'text-gray-500'}`}>{d}</span>
+                  </div>
+                );
+              });
+            }
+          }
+          return req.destinations.map((d, i) => (
+            <div key={i} className="flex items-center gap-[12px] p-[10px] rounded-[16px] bg-[#fffaf5] border border-transparent">
+              <MapPin size={14} className="text-[#ea580c] shrink-0" />
+              <span className="text-[#431407] font-bold text-[13px]">{d}</span>
+            </div>
+          ));
+        })()}
+      </div>
+
+      {req.status === 'SCHEDULED' && (() => {
+        const ride = rides.find(r => r.requestIds.includes(req.id));
+        if (!ride) return null;
+        return (
+          <div className="mt-5 space-y-4">
+            <div className="p-4 bg-[#ffedd5] rounded-3xl border border-transparent flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="bg-[#ea580c] p-2.5 rounded-2xl text-white shadow-md">
+                  <Clock size={14} />
+                </div>
+                <div>
+                  <div className="text-[13px] font-black text-[#431407]">Jadual: {formatTo12Hour(ride.time)}</div>
+                  <div className="text-[10px] font-bold opacity-60 text-[#9a3412]">Pemandu: {ride.driverName}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+    </Card>
+  );
 
   return (
     <div className="flex flex-col bg-[#fff7ed] min-h-[100dvh] max-w-md mx-auto relative overflow-hidden text-[#431407]">
@@ -234,120 +314,44 @@ export function RequesterHome() {
                 })}
               </div>
 
-              {filteredRequests.length === 0 ? (
-                <div className="text-center py-20 opacity-20">
-                  <Truck size={48} className="mx-auto mb-4" />
-                  <p className="font-black uppercase tracking-widest text-xs">Tiada permohonan ditemui</p>
+              <div className="space-y-4">
+                <div className="text-[10px] font-black uppercase text-[#431407]/40 tracking-widest ml-1 mt-4">Permohonan Saya</div>
+                {filteredRequests.length === 0 ? (
+                  <div className="text-center py-8 opacity-20">
+                    <p className="font-black uppercase tracking-widest text-xs">Tiada permohonan saya</p>
+                  </div>
+                ) : (
+                  filteredRequests.map(req => (
+                    <div key={req.id}>{renderRequestCard(req, true)}</div>
+                  ))
+                )}
+              </div>
+
+              {/* Global Scheduled Sessions Section */}
+              <div className="mt-10 border-t border-[#ea580c]/10 pt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="text-[10px] font-black uppercase text-[#ea580c] tracking-widest ml-1 flex items-center gap-2">
+                    <Calendar size={14} /> Jadual Keseluruhan (Pegawai Lain)
+                  </div>
+                  <button 
+                    onClick={() => setShowGlobal(!showGlobal)}
+                    className="text-[9px] font-black uppercase text-[#ea580c] bg-[#ea580c]/10 px-3 py-1.5 rounded-full hover:bg-[#ea580c]/20 transition-colors"
+                  >
+                    {showGlobal ? 'Sembunyi' : 'Lihat Jadual'}
+                  </button>
                 </div>
-              ) : (
-                filteredRequests.map((req, index) => {
-                  const showHeader = index === 0 || filteredRequests[index - 1].date !== req.date;
-                  return (
-                    <div key={req.id} className="space-y-4">
-                      {showHeader && (
-                        <div className="pt-4 pb-2">
-                          <div className="inline-block px-4 py-1.5 bg-[#ea580c]/5 border border-[#ea580c]/20 rounded-full text-[11px] font-black text-[#ea580c] uppercase tracking-widest">
-                            {getGroupHeader(req.date)}
-                          </div>
-                        </div>
-                      )}
-                      <Card className="relative !p-[20px] border-none shadow-sm overflow-visible">
-                        <div className="flex justify-between items-start mb-4">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge status={req.status}>{req.status}</Badge>
-                            <div className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg block w-fit ${
-                              getTimeCategory(req.timePreference) === 'Pagi' ? 'bg-amber-100 text-amber-700 border border-amber-200' :
-                              getTimeCategory(req.timePreference) === 'Petang' ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' :
-                              'bg-purple-100 text-purple-700 border border-purple-200'
-                            }`}>
-                              {formatTo12Hour(req.timePreference)}
-                            </div>
-                          </div>
-                          {['PENDING', 'COMPLETED', 'REJECTED'].includes(req.status) && (
-                            <div className="flex items-center gap-2">
-                              {req.status === 'PENDING' && (
-                                <button onClick={() => handleEdit(req)} className="p-2 text-amber-600 bg-amber-50 rounded-xl hover:bg-amber-100 transition-colors">
-                                  <Pencil size={16} />
-                                </button>
-                              )}
-                              <button onClick={() => handleDelete(req.id)} className="p-2 text-rose-600 bg-rose-50 rounded-xl hover:bg-rose-100 transition-colors">
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                        <div className="space-y-2">
-                          {(() => {
-                            if (req.status === 'SCHEDULED') {
-                              const ride = rides.find(r => r.requestIds.includes(req.id));
-                              if (ride) {
-                                return ride.acceptedDestinations.map((d, i) => {
-                                  const isMine = req.destinations.includes(d);
-                                  return (
-                                    <div key={i} className={`flex items-center gap-[12px] p-[10px] rounded-[16px] border ${isMine ? 'bg-[#ea580c]/5 border-[#ea580c] shadow-sm' : 'bg-gray-50 border-transparent opacity-60'}`}>
-                                      <MapPin size={14} className={isMine ? "text-[#ea580c]" : "text-gray-400"} />
-                                      <span className={`font-bold text-[13px] ${isMine ? 'text-[#431407]' : 'text-gray-500'}`}>{d}</span>
-                                    </div>
-                                  );
-                                });
-                              }
-                            }
-                            return req.destinations.map((d, i) => (
-                              <div key={i} className="flex items-center gap-[12px] p-[10px] rounded-[16px] bg-[#fffaf5] border border-transparent">
-                                <MapPin size={14} className="text-[#ea580c] shrink-0" />
-                                <span className="text-[#431407] font-bold text-[13px]">{d}</span>
-                              </div>
-                            ));
-                          })()}
-                        </div>
-
-                        {req.status === 'SCHEDULED' && (() => {
-                          const ride = rides.find(r => r.requestIds.includes(req.id));
-                          if (!ride) return null;
-                          const others = requests.filter(r => ride.requestIds.includes(r.id) && r.id !== req.id);
-
-                          return (
-                            <div className="mt-5 space-y-4">
-                              <div className="p-4 bg-[#ffedd5] rounded-3xl border border-transparent flex items-center justify-between">
-                                <div className="flex items-center gap-4">
-                                  <div className="bg-[#ea580c] p-2.5 rounded-2xl text-white shadow-md">
-                                    <Clock size={14} />
-                                  </div>
-                                  <div>
-                                    <div className="text-[13px] font-black text-[#431407]">Jadual: {formatTo12Hour(ride.time)}</div>
-                                    <div className="text-[10px] font-bold opacity-60 text-[#9a3412]">Pemandu: {ride.driverName}</div>
-                                  </div>
-                                </div>
-                                {ride.plateNumber && (
-                                  <div className="flex flex-col items-end gap-1">
-                                    <Plate number={ride.plateNumber} />
-                                    <div className="text-[9px] font-black uppercase opacity-40 text-right">
-                                      {ride.vehicleModel} • <span className="text-[#ea580c]">{ride.vehicleType}</span>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-
-                              {others.length > 0 && (
-                                <div className="px-1">
-                                  <div className="text-[10px] font-black uppercase opacity-30 mb-2 px-1">Bersama Pegawai:</div>
-                                  <div className="flex flex-wrap gap-2">
-                                    {others.map(o => (
-                                      <div key={o.id} className="px-3 py-1 bg-white border border-[#431407]/5 rounded-full text-[11px] font-bold text-[#431407]/60">
-                                        {o.requesterName || o.requesterUsername}
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })()}
-                      </Card>
+                {showGlobal && (
+                  allScheduledRequests.length === 0 ? (
+                    <div className="text-center py-8 opacity-20">
+                      <p className="font-black uppercase tracking-widest text-xs">Tiada jadual lain</p>
                     </div>
-                  );
-                })
-              )}
+                  ) : (
+                    <div className="space-y-4">
+                      {allScheduledRequests.map(req => renderRequestCard(req, false))}
+                    </div>
+                  )
+                )}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
