@@ -3,7 +3,7 @@ import { useAppStore } from '../store';
 import { Button, Input, DateInput, Card, Badge, Plate } from '../components/ui';
 import { LogOut, Plus, MapPin, X, Calendar, Clock, Info, Truck, Pencil, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { formatTo12Hour, formatToDDMMYYYY, getGroupHeader, getTimeCategory } from '../lib/dateUtils';
+import { formatTo12Hour, formatToDDMMYYYY, getGroupHeader, getTimeCategory, getMalayDayOfWeek } from '../lib/dateUtils';
 import { TimePreference } from '../types';
 
 export function RequesterHome() {
@@ -168,14 +168,12 @@ export function RequesterHome() {
             <div className="p-4 bg-[#ffedd5] rounded-3xl border border-transparent flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="bg-[#ea580c] p-2.5 rounded-2xl text-white shadow-md">
-                  <Clock size={14} />
+                  <Calendar size={14} />
                 </div>
                 <div>
-                  <div className="text-[13px] font-black text-[#431407]">Jadual: {formatTo12Hour(ride.time)}</div>
-                  <div className="text-[10px] font-bold opacity-60 text-[#9a3412]">Pemandu: {ride.driverName}</div>
+                  <div className="text-[13px] font-black text-[#431407]">Tarikh: {getMalayDayOfWeek(req.date)} - {formatToDDMMYYYY(req.date)}</div>                  <div className="text-[10px] font-bold opacity-60 text-[#9a3412]">Pemandu: {ride.driverName} • {formatTo12Hour(ride.time)}</div>
                 </div>
-              </div>
-            </div>
+              </div>            </div>
           </div>
         );
       })()}
