@@ -114,13 +114,15 @@ export function RequesterHome() {
               {req.requesterName || 'Pegawai'}
             </div>
           )}
-          <div className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg block w-fit ${
-            getTimeCategory(req.timePreference) === 'Pagi' ? 'bg-amber-100 text-amber-700 border border-amber-200' :
-            getTimeCategory(req.timePreference) === 'Petang' ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' :
-            'bg-purple-100 text-purple-700 border border-purple-200'
-          }`}>
-            {formatTo12Hour(req.timePreference)}
-          </div>
+          {req.status !== 'SCHEDULED' && (
+            <div className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg block w-fit ${
+              getTimeCategory(req.timePreference) === 'Pagi' ? 'bg-amber-100 text-amber-700 border border-amber-200' :
+              getTimeCategory(req.timePreference) === 'Petang' ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' :
+              'bg-purple-100 text-purple-700 border border-purple-200'
+            }`}>
+              {formatTo12Hour(req.timePreference)}
+            </div>
+          )}
         </div>
         {isMine && ['PENDING', 'COMPLETED', 'REJECTED'].includes(req.status) && (
           <div className="flex items-center gap-2">
@@ -165,15 +167,31 @@ export function RequesterHome() {
         if (!ride) return null;
         return (
           <div className="mt-5 space-y-4">
-            <div className="p-4 bg-[#ffedd5] rounded-3xl border border-transparent flex items-center justify-between">
+            <div className="p-4 bg-[#ffedd5] rounded-3xl border border-transparent flex flex-col gap-3">
               <div className="flex items-center gap-4">
                 <div className="bg-[#ea580c] p-2.5 rounded-2xl text-white shadow-md">
                   <Calendar size={14} />
                 </div>
                 <div>
-                  <div className="text-[13px] font-black text-[#431407]">Tarikh: {getMalayDayOfWeek(req.date)} - {formatToDDMMYYYY(req.date)}</div>                  <div className="text-[10px] font-bold opacity-60 text-[#9a3412]">Pemandu: {ride.driverName} • {formatTo12Hour(ride.time)}</div>
+                  <div className="text-[13px] font-black text-[#431407]">Tarikh: {getMalayDayOfWeek(req.date)} - {formatToDDMMYYYY(req.date)}</div>
+                  <div className="text-[11px] font-bold text-[#9a3412]">
+                    {ride.driverName} • {formatTo12Hour(ride.time)}
+                  </div>
                 </div>
-              </div>            </div>
+              </div>
+              
+              <div className="flex items-center justify-between border-t border-[#ea580c]/10 pt-3">
+                <div className="flex items-center gap-3">
+                  <div className="bg-[#ea580c]/10 p-2 rounded-xl text-[#ea580c]">
+                    <Truck size={14} />
+                  </div>
+                  <div className="text-[11px] font-black uppercase text-[#431407] opacity-80">
+                    {ride.vehicleModel || 'Kenderaan'}
+                  </div>
+                </div>
+                {ride.plateNumber && <Plate number={ride.plateNumber} />}
+              </div>
+            </div>
           </div>
         );
       })()}
